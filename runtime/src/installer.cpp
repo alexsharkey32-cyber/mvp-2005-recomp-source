@@ -12,7 +12,9 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <set>
 #include <thread>
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -237,15 +239,40 @@ static void write_installed(const std::map<std::string, std::string>& m) {
         fs::rename(tmp, std::string(kDir) + "/installed.txt", ec);
     }
 }
+// a feature being installed has features/<id>.incomplete: its version, then the archives already unpacked. Until
+// the last one is in, the feature isn't installed (its folders are there after the first archive of several), and
+// Install continues with the archives that are missing instead of starting over.
+static std::string incomplete_path(const std::string& id) { return std::string(kDir) + "/" + id + ".incomplete"; }
+static std::set<std::string> read_incomplete(const Feature& f) {
+    std::set<std::string> out;
+    if (FILE* fp = std::fopen(incomplete_path(f.id).c_str(), "r")) {
+        char line[512]; bool ok = false;
+        if (std::fgets(line, sizeof line, fp)) { std::string v = line; while (!v.empty() && (v.back() == '\n' || v.back() == '\r')) v.pop_back(); ok = v == "version " + f.version; }
+        while (ok && std::fgets(line, sizeof line, fp)) { std::string v = line; while (!v.empty() && (v.back() == '\n' || v.back() == '\r')) v.pop_back(); if (!v.empty()) out.insert(v); }
+        std::fclose(fp);
+    }
+    return out;
+}
+static void begin_incomplete(const Feature& f) {
+    std::error_code ec; fs::create_directories(kDir, ec);
+    const std::string p = incomplete_path(f.id);
+    if (!read_incomplete(f).empty()) return;                                 // continuing
+    if (FILE* fp = std::fopen(p.c_str(), "w")) { std::fprintf(fp, "version %s\n", f.version.c_str()); std::fclose(fp); }
+}
+static void mark_unpacked(const Feature& f, const std::string& file) {
+    if (FILE* fp = std::fopen(incomplete_path(f.id).c_str(), "a")) { std::fprintf(fp, "%s\n", file.c_str()); std::fclose(fp); }
+}
 static void refresh_state() {
     auto inst = read_installed();
     for (Feature& f : s_feats) {
         std::error_code ec; bool all = !f.paths.empty();
         for (auto& p : f.paths) if (!fs::exists(p, ec)) { all = false; break; }
+        const bool partial = fs::exists(incomplete_path(f.id), ec);           // stopped half way: still ticked, Install continues it
+        if (partial) all = false;
         f.installed = all;
         auto it = inst.find(f.id);
         f.installed_version = it != inst.end() && all ? it->second : "";
-        f.selected = f.installed || f.required;
+        f.selected = f.installed || f.required || partial;
         if (!g_settings.setup_done && inst.empty() && f.def) f.selected = true;      // the first setup: the recommended ones
     }
 }
@@ -365,52 +392,72 @@ bool features_busy() { return s_busy; }
 
 static void set_prog(const std::function<void(FeatureProgress&)>& f) { std::lock_guard<std::mutex> lk(s_mx); f(s_prog); }
 
-// one archive: downloaded (resumable) into features/downloads/, checked, unpacked into the game folder, deleted
-static bool install_part(const Feature& f, const FeaturePart& p, uint64_t base_done, std::string& err) {
+// Downloads run several at once (kConnections curl processes, each fetching a different archive): one connection
+// to GitHub's download servers rarely gets near a fast line's speed, several together do. Archives are checked and
+// unpacked in order on the worker thread while the next ones download. Downloading ahead only goes as far as the
+// drive has room for (everything still to unpack, plus the archives on their way): a nearly full drive downloads
+// one archive at a time, as before.
+static const int kConnections = 4;
+struct PartJob {
+    Feature* f = nullptr; const FeaturePart* p = nullptr;
+    std::string src;                       // the archive on disk (in features/downloads/, or an offline copy)
+    bool downloaded = false;               // fetched by us (deleted after unpacking)
+    std::atomic<int> state{0};             // 0 waiting, 1 downloading, 2 on disk, 3 failed
+    std::atomic<uint64_t> got{0};          // bytes on disk so far
+    std::string err;
+};
+static int connections() {
+    if (const char* e = std::getenv("MVP_DL_CONNECTIONS")) { int n = std::atoi(e); if (n >= 1 && n <= 16) return n; }
+    return kConnections;
+}
+
+// one archive into features/downloads/ (resumable); on any thread
+static void download_part(PartJob& j) {
     std::error_code ec;
+    const FeaturePart& p = *j.p;
+    j.src = local_copy(p.file);
+    if (!j.src.empty()) { j.got = p.size; j.state = 2; return; }
+    const std::string url = url_for(p.file, p.url);
+    if (url.empty()) { j.err = "No download address for " + p.file + "."; j.state = 3; return; }
     const std::string dl_dir = std::string(kDir) + "/downloads"; fs::create_directories(dl_dir, ec);
-    const std::string log = std::string(kDir) + "/download.log";
-    std::string src = local_copy(p.file);
-    bool downloaded = false;
-    if (src.empty()) {
-        const std::string url = url_for(p.file, p.url);
-        if (url.empty()) { err = "No download address for " + p.file + "."; return false; }
-        src = dl_dir + "/" + p.file;
-        if (!(p.size && file_size(src) == p.size)) {
-            set_prog([&](FeatureProgress& g) { g.phase = FP_DOWNLOADING; g.step = "Downloading " + p.file; });
-            auto t0 = std::chrono::steady_clock::now(); uint64_t s0 = file_size(src); double spd = 0;
-            int rc = run_process(std::vector<std::string>{tool("curl"), "-L", "--fail", "-s", "-S", "--retry", "5", "--retry-delay", "3", "--connect-timeout", "20",
-                                                          "-C", "-", "-o", src, url}, log, [&] {
-                uint64_t n = file_size(src);
-                double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-                if (el > 0.5) spd = spd * 0.7 + 0.3 * ((n - std::min(n, s0)) / el);
-                set_prog([&](FeatureProgress& g) { g.done = base_done + std::min<uint64_t>(n, p.size ? p.size : n); g.speed = spd; });
-            });
-            if (rc == -2) { err = "cancelled"; return false; }
-            if (rc == -1) { err = "curl is missing, so features can't be downloaded."; return false; }
-            if (rc == 33 && p.size && file_size(src) == p.size) rc = 0;            // resumed a file that was already complete
-            if (rc != 0) { err = "Download of " + p.file + " failed (curl error " + std::to_string(rc) + "). Check your connection and press Install again: it continues where it stopped."; return false; }
-        }
-        downloaded = true;
-    }
-    set_prog([&](FeatureProgress& g) { g.done = base_done + p.size; });
+    j.src = dl_dir + "/" + p.file; j.downloaded = true;
+    if (p.size && file_size(j.src) == p.size) { j.got = p.size; j.state = 2; return; }
+    j.state = 1;
+    auto fetch = [&](bool resume) {
+        std::vector<std::string> av{tool("curl"), "-L", "--fail", "-s", "-S", "--retry", "5", "--retry-delay", "3", "--connect-timeout", "20"};
+        if (resume) { av.push_back("-C"); av.push_back("-"); }
+        av.push_back("-o"); av.push_back(j.src); av.push_back(url);
+        return run_process(av, std::string(kDir) + "/download.log", [&] { uint64_t n = file_size(j.src); j.got = p.size ? std::min<uint64_t>(n, p.size) : n; });
+    };
+    int rc = fetch(true);
+    if (rc == 33 && p.size && file_size(j.src) == p.size) rc = 0;             // resumed a file that was already complete
+    else if (rc == 33) { fs::remove(j.src, ec); rc = fetch(false); }        // the server can't resume: start that file over
+    if (rc == 0) { j.got = p.size ? p.size : file_size(j.src); j.state = 2; return; }
+    j.err = rc == -2 ? "cancelled" : rc == -1 ? std::string("curl is missing, so features can't be downloaded.")
+          : "Download of " + p.file + " failed (curl error " + std::to_string(rc) + "). Check your connection and press Install again: it continues where it stopped.";
+    j.state = 3;
+}
+
+// one downloaded archive: checked, unpacked into the game folder, deleted; on the worker thread
+static bool unpack_part(PartJob& j, std::string& err) {
+    std::error_code ec;
+    const FeaturePart& p = *j.p;
     if (!p.sha256.empty()) {
         set_prog([&](FeatureProgress& g) { g.phase = FP_VERIFYING; g.step = "Checking " + p.file; });
         Sha256 h; std::vector<uint8_t> buf(1 << 20);
-        if (FILE* fp = std::fopen(src.c_str(), "rb")) { size_t n; while ((n = std::fread(buf.data(), 1, buf.size(), fp)) > 0) { h.add(buf.data(), n); if (s_cancel) break; } std::fclose(fp); }
+        if (FILE* fp = std::fopen(j.src.c_str(), "rb")) { size_t n; while ((n = std::fread(buf.data(), 1, buf.size(), fp)) > 0) { h.add(buf.data(), n); if (s_cancel) break; } std::fclose(fp); }
         if (s_cancel) { err = "cancelled"; return false; }
         if (h.hex() != p.sha256) {
-            if (downloaded) fs::remove(src, ec);
+            if (j.downloaded) fs::remove(j.src, ec);
             err = p.file + " arrived damaged (its checksum doesn't match). Press Install again to download it once more."; return false;
         }
     }
     set_prog([&](FeatureProgress& g) { g.phase = FP_EXTRACTING; g.step = "Unpacking " + p.file; });
     const std::string root = fs::current_path(ec).string();
-    int rc = run_process(std::vector<std::string>{tool("tar"), "-xf", src, "-C", root}, log, [] {});
+    int rc = run_process(std::vector<std::string>{tool("tar"), "-xf", j.src, "-C", root}, std::string(kDir) + "/download.log", [] {});
     if (rc == -2) { err = "cancelled"; return false; }
     if (rc != 0) { err = rc == -1 ? std::string("tar is missing, so features can't be unpacked.") : "Unpacking " + p.file + " failed (tar error " + std::to_string(rc) + "). Is the disk full?"; return false; }
-    if (downloaded) fs::remove(src, ec);                                    // the archive's job is done
-    (void)f;
+    if (j.downloaded) fs::remove(j.src, ec);                                  // the archive's job is done
     return true;
 }
 static void apply_settings(const std::vector<std::pair<std::string, int>>& v) { for (auto& p : v) settings_set(p.first, p.second); }
@@ -426,33 +473,99 @@ static void worker() {
     std::vector<Feature*> add, del;
     for (Feature& f : s_feats) {
         if (f.selected && (!f.installed || needs_update(f))) add.push_back(&f);
-        if (!f.selected && f.installed) del.push_back(&f);
+        std::error_code ec;
+        if (!f.selected && (f.installed || fs::exists(incomplete_path(f.id), ec))) del.push_back(&f);
     }
-    uint64_t total = 0; for (Feature* f : add) for (auto& p : f->parts) total += p.size;
+    std::map<std::string, std::set<std::string>> have;                       // archives a stopped install already unpacked
+    for (Feature* f : add) have[f->id] = read_incomplete(*f);
+    uint64_t total = 0; for (Feature* f : add) for (auto& p : f->parts) if (!have[f->id].count(p.file)) total += p.size;
     { std::lock_guard<std::mutex> lk(s_mx); s_job.clear(); for (Feature* f : del) s_job.push_back({f->name, false}); for (Feature* f : add) s_job.push_back({f->name, true}); }
     set_prog([&](FeatureProgress& g) { g = FeatureProgress(); g.total = total; g.features_total = (int)(add.size() + del.size()); });
     auto inst = read_installed();
-    std::string err; uint64_t done = 0; int nd = 0;
+    std::string err; int nd = 0;
     std::error_code ec;
     for (Feature* f : del) {
         set_prog([&](FeatureProgress& g) { g.phase = FP_REMOVING; g.feature = f->name; g.step = "Removing " + f->name; });
         for (auto& p : f->remove.empty() ? f->paths : f->remove) fs::remove_all(p, ec);
+        fs::remove(incomplete_path(f->id), ec);
         inst.erase(f->id); write_installed(inst);
         revert_settings(*f);
         rlog("features", "removed %s", f->id.c_str());
         set_prog([&](FeatureProgress& g) { g.features_done = ++nd; });
     }
+    // every archive of every feature to add, in install order; downloaders take them from the front
+    std::vector<std::unique_ptr<PartJob>> jobs;
+    for (Feature* f : add) for (const FeaturePart& p : f->parts) if (!have[f->id].count(p.file)) { jobs.emplace_back(new PartJob); jobs.back()->f = f; jobs.back()->p = &p; }
+    std::atomic<size_t> next{0}, unpacked{0};
+    std::atomic<bool> stop{false};
+    std::vector<uint64_t> rest(jobs.size() + 1, 0);                         // rest[i]: bytes of archives i.. (unpacked ~ the same size)
+    for (size_t i = jobs.size(); i-- > 0;) rest[i] = rest[i + 1] + jobs[i]->p->size;
+    auto room_for = [&](size_t i) {
+        size_t u = unpacked;
+        if (i == u) return true;                                             // the next one to unpack always goes
+        uint64_t coming = 0; for (auto& j : jobs) if (j->state == 1) coming += j->p->size - std::min(j->p->size, j->got.load());
+        return features_disk_free() >= rest[u] + coming + jobs[i]->p->size + 1000000000ull;
+    };
+    std::vector<std::thread> dl;
+    const int nconn = std::max(1, std::min<int>(connections(), (int)jobs.size()));
+    for (int t = 0; t < nconn; t++) dl.emplace_back([&] {
+        for (;;) {
+            size_t i;
+            for (;;) {                                                       // wait for room: at most kAhead archives ahead of unpacking
+                if (stop || s_cancel) return;
+                i = next.load();
+                if (i >= jobs.size()) return;
+                if (i <= unpacked + nconn && room_for(i) && next.compare_exchange_weak(i, i + 1)) break;
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+            download_part(*jobs[i]);
+        }
+    });
+    auto t_last = std::chrono::steady_clock::now(); uint64_t b_last = 0; double spd = 0;
+    auto bytes = [&] { uint64_t n = 0; for (auto& j : jobs) n += j->state == 2 ? j->p->size : j->got.load(); return n; };
+    auto tick = [&](const char* step_of) {                                   // progress while waiting for downloads
+        auto now = std::chrono::steady_clock::now(); double el = std::chrono::duration<double>(now - t_last).count();
+        uint64_t n = bytes();
+        if (el >= 0.5) { double s = (n - std::min(n, b_last)) / el; spd = spd == 0 ? s : spd * 0.7 + 0.3 * s; t_last = now; b_last = n; }
+        int active = 0; for (auto& j : jobs) if (j->state == 1) active++;
+        set_prog([&](FeatureProgress& g) {
+            g.done = std::min(n, total); g.speed = spd;
+            if (step_of) { g.phase = FP_DOWNLOADING; g.step = std::string("Downloading ") + step_of + (active > 1 ? " (+" + std::to_string(active - 1) + " more at once)" : ""); }
+        });
+    };
+    b_last = bytes();
+    size_t k = 0;
     for (Feature* f : add) {
         set_prog([&](FeatureProgress& g) { g.feature = f->name; });
-        if (needs_update(*f)) for (auto& p : f->remove.empty() ? f->paths : f->remove) fs::remove_all(p, ec);
+        if (needs_update(*f) && have[f->id].empty()) for (auto& p : f->remove.empty() ? f->paths : f->remove) fs::remove_all(p, ec);
         bool ok = true;
-        for (const FeaturePart& p : f->parts) { if (!install_part(*f, p, done, err)) { ok = false; break; } done += p.size; }
+        size_t todo = 0; for (auto& p : f->parts) if (!have[f->id].count(p.file)) todo++;
+        for (size_t n = 0; n < todo; n++, k++) {
+            PartJob& j = *jobs[k];
+            while (j.state < 2 && !s_cancel) { tick(j.p->file.c_str()); std::this_thread::sleep_for(std::chrono::milliseconds(100)); }
+            if (s_cancel) { err = "cancelled"; ok = false; break; }
+            if (j.state == 3) { err = j.err; ok = false; break; }
+            tick(nullptr);
+            begin_incomplete(*f);
+            std::atomic<bool> unpacking{true};
+            std::thread prog([&] { while (unpacking) { tick(nullptr); std::this_thread::sleep_for(std::chrono::milliseconds(200)); } });
+            ok = unpack_part(j, err);                                        // downloads go on meanwhile
+            unpacking = false; prog.join();
+            unpacked++;
+            if (!ok) break;
+            mark_unpacked(*f, j.p->file);
+        }
         if (!ok) break;
+        fs::remove(incomplete_path(f->id), ec);
         inst[f->id] = f->version; write_installed(inst);
         apply_settings(f->on_install);
         rlog("features", "installed %s %s", f->id.c_str(), f->version.c_str());
         set_prog([&](FeatureProgress& g) { g.features_done = ++nd; });
     }
+    stop = true;
+    if (!err.empty() && err != "cancelled") s_cancel = true;                // a failure stops the other downloads (they resume next time)
+    for (auto& t : dl) t.join();
+    s_cancel = false;
     if (g_settings.rosters == 2 && !fs::exists("mods/" + g_settings.league + "/pack.json", ec))       // its league pack was removed
         g_settings.rosters = fs::exists("mods/rosters-2026", ec) ? 1 : 0;
     if (g_settings.rosters == 1 && !fs::exists("mods/rosters-2026", ec)) g_settings.rosters = 0;
