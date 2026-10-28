@@ -1,0 +1,40 @@
+# address   native wrapper            reason
+# Functions listed here are recompiled as f_<address>_orig; f_<address> calls the wrapper, which may call the original.
+0x004934b8  hle_date_to_days           # date {month, day, year} -> day number: the year moved back by g_year_shift first
+0x00493610  hle_days_to_date           # day number -> date: the year moved forward by g_year_shift
+0x0019d2b0  hle_pitch_quality          # pitch quality for simulated games / ratings: the fastball constant comes from the roster mod
+0x0018c308  hle_db_attr_get            # front-end attribute reads: whose record a screen shows (headshot captures)
+0x0039f158  hle_game_attr_get          # in-game attribute reads of a card slot: whose portrait is next
+0x001db260  hle_portrait_photo         # portrait "%04d.ssh": the rendered portrait of a player who has one (mods/portraits-2026)
+0x001db1f0  hle_portrait_generic       # generic portrait: likewise
+0x00676a58  hle_make_rookies           # draft class: rookies (MVP_TRACE_ROOKIE)
+0x0018c488  hle_db_attr_set            # database attribute writes
+0x0018c500  hle_db_str_set             # database string writes
+0x006edc28  hle_draft_class            # a draft class: which year (league packs bring their own, mods/<pack>/draft/<year>.csv)
+0x006f0630  hle_rookie                 # one rookie of the class: overwritten with the pack's next player of his kind
+0x00182f10  hle_rating_norm            # rating / maximum for the simulation: optional spread of split contact / power (sim.txt)
+0x007140e8  hle_pa_probs               # a simulated plate appearance's outcome probabilities after the count (MVP_TRACE_PA)
+0x007186f8  hle_sim_single             # simulated single: base running trace (MVP_TRACE_RUNS)
+0x007189c8  hle_sim_double             # simulated double: likewise
+0x00717eb8  hle_sim_out24              # simulated out in play (+24): likewise
+0x00717b88  hle_sim_out28              # simulated out in play (+28): likewise
+0x0070d1f0  hle_tiebreak_check         # end of a level's season: tie games to schedule? (stops the sim; never twice for nothing)
+0x00716ef8  hle_sim_pa                 # a simulated plate appearance's outcome: wild pitches / passed balls first (real league)
+0x00196a48  hle_season_games           # games a club plays in a season by league: a pack's shorter schedule (sim.txt season_games)
+0x004b8568  hle_db_lookup              # database key lookup: a host cache of where each key sits in the index
+0x001a2d80  hle_rev_lookup             # reverse index lookup (key of first entry with a given row): scanned natively
+0x00749510  hle_rotation_next          # a club's rotation moves on a turn: a four-man rotation before 1975
+0x007199d0  hle_sim_pitch_change       # simulated game: change pitchers? (MVP_TRACE_SUBS counts)
+0x007196c0  hle_sim_hit_for_p          # simulated game: pinch-hit for the pitcher? (MVP_TRACE_SUBS counts)
+0x00751dc0  hle_sim_ph_a               # pinch-hit for the pitcher? (rule set a): the old eras let a fresh pitcher bat
+0x00751f38  hle_sim_ph_b               # likewise (rule set b)
+0x00751fc8  hle_sim_ph_c               # likewise (rule set c)
+0x00713558  hle_pa_fill                # simulated plate appearance: fill from the ratings (whose home-run factor applies)
+0x00717278  hle_sim_forced             # simulated outcome made before the draw (MVP_TRACE_FORCED counts)
+0x001aeae8  hle_club_setup             # a club's game set-up: lists past RAM logged and emptied (1910 crash)
+0x0071af18  hle_sim_tire               # a simulated pitcher tires a batter: relievers faster in the one-inning eras
+0x0071a558  hle_sim_pick               # a simulated reliever pick: the rotation last in the one-inning eras
+0x0071a050  hle_sim_change             # a simulated pitching change: a second try for a spent pitcher
+0x005a65c0  hle_cd_delay               # the disc module's waits between drive polls: short (reads finish at once)
+0x001ce958  hle_movie_start            # a movie starts: the boot movies skipped unless intro_movies
+0x007520a8  hle_sim_avail              # is a simulated pitcher rested (not a third day in a row in the one-inning eras)

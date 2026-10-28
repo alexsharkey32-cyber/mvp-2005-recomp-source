@@ -1,0 +1,4 @@
+# address   native function            reason
+# Functions listed here are NOT recompiled; the runtime supplies a native implementation.
+0x005dfe00  hle_return                 # _InitSys: patches the real PS2 kernel (InitAlarm/InitThread/...), not needed with an HLE kernel
+0x005dafc8  hle_tty_write              # libkernel DECI2 tty output (printf): print to host stderr

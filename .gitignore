@@ -1,0 +1,25 @@
+# your disc and everything made from it on your machine
+game/
+*.iso
+mods/*
+!mods/league_rates.txt
+!mods/era-logos/
+textures/
+features/
+memcards/
+music/
+teams/
+# builds
+build/
+build_*/
+out/
+dist/
+__pycache__/
+*.o
+*.log
+mvp2005.ini
+lahman*
+faces_work/
+# made from your disc by tools/recomp/ee_recomp.py
+generated/
+*.so

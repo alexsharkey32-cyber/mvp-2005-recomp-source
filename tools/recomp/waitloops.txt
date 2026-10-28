@@ -1,0 +1,5 @@
+# Backward branches of loops in which the game only spins until an interrupt handler clears a flag.
+# The recompiler emits ee_wait_poll() there instead of ee_poll(): when nothing is due the runtime sleeps
+# until the graphics thread reports something or the next timer, instead of burning a core.
+# address     note
+0x0054a0f4    # EAGL frame sync: while (display->busy) { callback(); 32 nops }

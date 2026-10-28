@@ -1,0 +1,524 @@
+<title>MVP Team Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Graduate&family=Alfa+Slab+One&family=Bungee&family=Oleo+Script:wght@700&family=Yellowtail&family=Lobster&family=Teko:wght@600&family=Rye&family=Pirata+One&family=Kaushan+Script&family=Archivo:wght@400;600;800&family=Archivo+Narrow:wght@500;700&display=swap">
+<style>
+/* Layout: a dugout clipboard — controls on the left rail, the club's look laid out like a style sheet on the right */
+:root {
+  --bg: #eef0ea;           /* infield chalk */
+  --panel: #f8f9f5;
+  --ink: #1d2420;
+  --muted: #5d685f;
+  --line: #d3d8cf;
+  --accent: #2f6b45;       /* outfield grass */
+  --accent-ink: #ffffff;
+  --well: #dfe4db;
+  --display: "Graduate", "Rockwell", Georgia, serif;
+  --body: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --label: "Archivo Narrow", "Arial Narrow", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #151a17; --panel: #1d2420; --ink: #e7ebe4; --muted: #9aa69c; --line: #313a34; --accent: #6fbf8a; --accent-ink: #0f1a13; --well: #262e29; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #151a17; --panel: #1d2420; --ink: #e7ebe4; --muted: #9aa69c; --line: #313a34; --accent: #6fbf8a; --accent-ink: #0f1a13; --well: #262e29; color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--body); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 16px; padding-block: 18px 40px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 14px; }
+header.top h1 { font: 400 26px/1.1 var(--display); margin: 0; letter-spacing: .02em; text-wrap: balance; }
+header.top p { margin: 0; color: var(--muted); }
+.grid { display: grid; grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.rail { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 6px; background: var(--well); }
+.tabs button { flex: 1 1 auto; border: 0; background: transparent; color: var(--muted); font: 600 12px var(--label); text-transform: uppercase; letter-spacing: .08em; padding: 8px 8px; border-radius: 6px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+.tabs button:focus-visible, .btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pane { padding: 14px 16px 18px; display: grid; gap: 12px; }
+.field { display: grid; gap: 5px; }
+.field > span { font: 600 11px var(--label); text-transform: uppercase; letter-spacing: .09em; color: var(--muted); }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+input[type=text], select { width: 100%; font: 14px var(--body); padding: 8px 9px; border-radius: 7px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); }
+.swatch { display: flex; align-items: center; gap: 8px; }
+.swatch input[type=color] { width: 40px; height: 32px; border: 1px solid var(--line); border-radius: 6px; padding: 2px; background: var(--bg); cursor: pointer; }
+.swatch code { font: 12px ui-monospace, Menlo, monospace; color: var(--muted); }
+.check { display: flex; align-items: center; gap: 8px; }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.presets button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chips button { border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 5px 11px; font: 600 12px var(--label); cursor: pointer; }
+.chips button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+.btn { border: 0; background: var(--accent); color: var(--accent-ink); font: 700 13px var(--label); letter-spacing: .06em; text-transform: uppercase; padding: 11px 14px; border-radius: 8px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.board { display: grid; gap: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; min-width: 0; }
+.card h3 { margin: 0; font: 600 11px var(--label); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); display: flex; justify-content: space-between; }
+.card canvas { width: 100%; height: auto; display: block; border-radius: 6px; }
+.c-logo { grid-column: span 3; } .c-cap { grid-column: span 3; } .c-word { grid-column: span 6; }
+.c-home, .c-road { grid-column: span 3; } .c-park { grid-column: span 6; }
+.fences { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.fences label { display: grid; gap: 3px; font-size: 11px; color: var(--muted, #888); }
+.fences input { width: 100%; min-width: 0; }
+@media (max-width: 560px) { .c-logo, .c-cap, .c-home, .c-road { grid-column: span 6; } }
+.studio { background: repeating-conic-gradient(var(--well) 0 25%, var(--panel) 0 50%) 0 0 / 18px 18px; }
+.status { font-size: 13px; color: var(--muted); min-height: 1.4em; }
+.namebar { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 14px; flex-wrap: wrap; }
+.namebar .big { font: 400 22px/1.1 var(--display); }
+.namebar .abbr { font: 700 12px var(--label); letter-spacing: .12em; padding: 3px 8px; border-radius: 4px; }
+.namebar .slot { margin-left: auto; color: var(--muted); font-size: 12.5px; }
+pre.json { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; max-height: 220px; font: 12px ui-monospace, Menlo, monospace; margin: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Team Maker</h1>
+    <p>Design a club for MVP Baseball 2005 (recompiled): name, colours, logos and uniforms. Export it and add it to a league pack.</p>
+  </header>
+
+  <div class="namebar">
+    <canvas id="mini" width="96" height="96" style="width:48px;height:48px"></canvas>
+    <div class="big" id="nb-name">Portland Pioneers</div>
+    <div class="abbr" id="nb-abbr">POR</div>
+    <div class="slot" id="nb-slot">Replaces: Tampa Bay Rays</div>
+  </div>
+
+  <div class="grid">
+    <div class="rail">
+      <div class="tabs" role="tablist" id="tabs">
+        <button role="tab" data-t="club" aria-selected="true">Club</button>
+        <button role="tab" data-t="colors">Colours</button>
+        <button role="tab" data-t="logo">Logo</button>
+        <button role="tab" data-t="cap">Cap</button>
+        <button role="tab" data-t="word">Wordmark</button>
+        <button role="tab" data-t="uni">Uniforms</button>
+        <button role="tab" data-t="park">Ballpark</button>
+        <button role="tab" data-t="export">Export</button>
+      </div>
+
+      <section class="pane" data-p="club">
+        <label class="field"><span>City</span><input type="text" id="city" maxlength="20"></label>
+        <label class="field"><span>Nickname</span><input type="text" id="name" maxlength="18"></label>
+        <div class="row2">
+          <label class="field"><span>Abbreviation</span><input type="text" id="abbr" maxlength="3"></label>
+          <label class="field"><span>Replaces club</span><select id="slot"></select></label>
+        </div>
+        <p class="hint">The game has 30 big-league clubs. Your club takes over one of them: its schedule, division and ballpark.</p>
+      </section>
+
+      <section class="pane" data-p="colors" hidden>
+        <div class="row3">
+          <label class="field"><span>Primary</span><div class="swatch"><input type="color" id="c1"><code id="c1t"></code></div></label>
+          <label class="field"><span>Secondary</span><div class="swatch"><input type="color" id="c2"><code id="c2t"></code></div></label>
+          <label class="field"><span>Accent</span><div class="swatch"><input type="color" id="c3"><code id="c3t"></code></div></label>
+        </div>
+        <div class="field"><span>Classic combinations</span><div class="presets" id="presets"></div></div>
+        <p class="hint">Primary is the cap, piping and lettering. Secondary outlines letters and numbers. Accent fills badges and trim.</p>
+      </section>
+
+      <section class="pane" data-p="logo" hidden>
+        <div class="field"><span>Badge</span><div class="chips" id="badge"></div></div>
+        <div class="row2">
+          <label class="field"><span>Monogram</span><input type="text" id="mono" maxlength="3"></label>
+          <label class="field"><span>Lettering</span><select id="monoFont"></select></label>
+        </div>
+        <div class="field"><span>Emblem</span><div class="chips" id="emblem"></div></div>
+        <label class="check"><input type="checkbox" id="ringText"> City and nickname around the badge</label>
+        <label class="check"><input type="checkbox" id="swoosh"> Swoosh under the monogram</label>
+        <label class="field"><span>Or use your own logo (PNG with transparency)</span><input type="file" id="logoFile" accept="image/png,image/webp"></label>
+        <button class="btn ghost" id="logoClear" type="button" hidden>Use the designed logo again</button>
+      </section>
+
+      <section class="pane" data-p="cap" hidden>
+        <div class="row2">
+          <label class="field"><span>Cap letters</span><input type="text" id="capText" maxlength="3"></label>
+          <label class="field"><span>Lettering</span><select id="capFont"></select></label>
+        </div>
+        <div class="row2">
+          <label class="field"><span>Crown</span><div class="swatch"><input type="color" id="crown"><code id="crownt"></code></div></label>
+          <label class="field"><span>Brim</span><div class="swatch"><input type="color" id="brim"><code id="brimt"></code></div></label>
+        </div>
+        <label class="check"><input type="checkbox" id="capUseLogo"> Put the primary logo on the cap instead</label>
+        <label class="field"><span>Or your own cap logo (PNG)</span><input type="file" id="capFile" accept="image/png,image/webp"></label>
+      </section>
+
+      <section class="pane" data-p="word" hidden>
+        <label class="field"><span>Text on the jersey</span><input type="text" id="wordText" maxlength="16"></label>
+        <label class="field"><span>Lettering</span><select id="wordFont"></select></label>
+        <label class="field"><span>Arch</span><input type="range" id="arch" min="0" max="100"></label>
+        <label class="check"><input type="checkbox" id="tail"> Tail under the letters</label>
+        <label class="field"><span>Or your own wordmark (PNG)</span><input type="file" id="wordFile" accept="image/png,image/webp"></label>
+      </section>
+
+      <section class="pane" data-p="uni" hidden>
+        <div class="row2">
+          <label class="field"><span>Home cloth</span><div class="swatch"><input type="color" id="homeCloth"><code id="homeClotht"></code></div></label>
+          <label class="field"><span>Road cloth</span><div class="swatch"><input type="color" id="roadCloth"><code id="roadClotht"></code></div></label>
+        </div>
+        <label class="field"><span>Road jersey says</span><select id="roadWord"><option value="name">Nickname (same as home)</option><option value="city">City</option></select></label>
+        <label class="check"><input type="checkbox" id="piping"> Piping on the placket and sleeves</label>
+        <label class="check"><input type="checkbox" id="pins"> Pinstripes at home</label>
+        <div class="row2">
+          <label class="field"><span>Numbers</span><div class="swatch"><input type="color" id="numFill"><code id="numFillt"></code></div></label>
+          <label class="field"><span>Number outline</span><div class="swatch"><input type="color" id="numLine"><code id="numLinet"></code></div></label>
+        </div>
+        <p class="hint">The game's own uniforms are the pattern: folds, collar and stitching stay; colours, letters and logos are yours.</p>
+      </section>
+
+      <section class="pane" data-p="park" hidden>
+        <label class="field"><span>Ballpark name</span><input type="text" id="parkName" maxlength="28"></label>
+        <label class="field"><span>Built on</span><select id="parkBase"></select></label>
+        <div class="field"><span>Fences (feet)</span>
+          <div class="fences">
+            <label>Left line<input type="number" id="f0" min="250" max="500"></label>
+            <label>Left-centre<input type="number" id="f1" min="250" max="500"></label>
+            <label>Centre<input type="number" id="f2" min="250" max="500"></label>
+            <label>Right-centre<input type="number" id="f3" min="250" max="500"></label>
+            <label>Right line<input type="number" id="f4" min="250" max="500"></label>
+          </div>
+        </div>
+        <div class="field"><span>Shapes</span><div class="chips" id="parkPresets"></div></div>
+        <p class="hint">The game can't build a new ballpark, so yours is one of its own, old or new, with your name and your fences: the outfield, the wall and the stands behind it move to the distances you set. Wall heights and the numbers painted on the wall stay as they are.</p>
+      </section>
+
+      <section class="pane" data-p="export" hidden>
+        <p class="hint" style="font-size:13.5px;color:var(--ink)">Saves <b id="zipName">POR-team.zip</b>: the logos as PNG, the uniform settings and the club's details.</p>
+        <button class="btn" id="export" type="button">Save team file</button>
+        <div class="status" id="status" role="status"></div>
+        <div class="field"><span>Then: put the file in the <b>teams</b> folder of the game folder and press <b>Build My League</b> on the Eras page (F1 menu or launcher). Or by hand:</span>
+          <pre class="json" id="cmd"></pre>
+        </div>
+        <details><summary class="hint">team.json</summary><pre class="json" id="json"></pre></details>
+      </section>
+    </div>
+
+    <div>
+      <div class="board">
+        <div class="card c-logo"><h3>Primary logo <span>512 px</span></h3><canvas id="cvLogo" class="studio" width="512" height="512"></canvas></div>
+        <div class="card c-cap"><h3>Cap <span>logo + crown</span></h3><canvas id="cvCap" width="512" height="512"></canvas></div>
+        <div class="card c-word"><h3>Wordmark <span>1024 × 320</span></h3><canvas id="cvWord" class="studio" width="1024" height="320"></canvas></div>
+        <div class="card c-home"><h3>Home</h3><canvas id="cvHome" width="512" height="560"></canvas></div>
+        <div class="card c-road"><h3>Road</h3><canvas id="cvRoad" width="512" height="560"></canvas></div>
+        <div class="card c-park"><h3>Ballpark <span id="parkSub">from above</span></h3><canvas id="cvPark" width="1024" height="620"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const SLOTS = [["Ana","Los Angeles Angels"],["Oak","Athletics"],["Sea","Seattle Mariners"],["Tex","Texas Rangers"],["CWS","Chicago White Sox"],["Cle","Cleveland Guardians"],["Det","Detroit Tigers"],["KC","Kansas City Royals"],["Min","Minnesota Twins"],["Bal","Baltimore Orioles"],["Bos","Boston Red Sox"],["NYY","New York Yankees"],["TB","Tampa Bay Rays"],["Tor","Toronto Blue Jays"],["Ari","Arizona Diamondbacks"],["Col","Colorado Rockies"],["LA","Los Angeles Dodgers"],["SD","San Diego Padres"],["SF","San Francisco Giants"],["ChC","Chicago Cubs"],["Cin","Cincinnati Reds"],["Hou","Houston Astros"],["Mil","Milwaukee Brewers"],["Pit","Pittsburgh Pirates"],["StL","St. Louis Cardinals"],["Atl","Atlanta Braves"],["Fla","Miami Marlins"],["Was","Washington Nationals"],["NYM","New York Mets"],["Phi","Philadelphia Phillies"]];
+const FONTS = [["Graduate","Collegiate block"],["Alfa Slab One","Slab serif"],["Bungee","Bold block"],["Teko","Condensed"],["Rye","Frontier"],["Pirata One","Old English"],["Oleo Script","Script, heavy"],["Lobster","Script, rounded"],["Yellowtail","Script, flowing"],["Kaushan Script","Brush script"]];
+const BADGES = [["none","None"],["roundel","Roundel"],["circle","Circle"],["shield","Shield"],["diamond","Diamond"],["oval","Oval"],["hexagon","Hexagon"]];
+const EMBLEMS = [["none","Letters only"],["star","Star"],["bats","Crossed bats"],["ball","Baseball"],["pine","Pine tree"],["anchor","Anchor"]];
+const PRESETS = [["#10503c","#ebc85a","#f4efe2"],["#13274f","#ce1141","#ffffff"],["#0c2340","#ff6600","#ffffff"],["#5a2d82","#c4ced4","#ffffff"],["#a71930","#e3d4ad","#000000"],["#003831","#efb21e","#ffffff"],["#000000","#c6011f","#ffffff"],["#002d72","#97999b","#ffffff"],["#6e2c00","#ffc425","#ffffff"],["#00a3e0","#ef3340","#ffffff"]];
+
+const PARKS = [["", "The club's own park"], ["TIGR", "Tiger Stadium"], ["POLO", "Polo Grounds"], ["FORB", "Forbes Field"], ["SHIB", "Shibe Park"], ["CROS", "Crosley Field"], ["GRIF", "Griffith Stadium"], ["SPOT", "Sportsman's Park"], ["FENC", "Fenway Park (classic)"], ["ASTR", "Astrodome"], ["VETE", "Veterans Stadium"], ["CINE", "Riverfront Stadium"], ["CLEV", "Cleveland Stadium"], ["METP", "Metropolitan Stadium"], ["OLYM", "Olympic Stadium"], ["QUAL", "Jack Murphy Stadium"], ["WRIG", "Wrigley Field"], ["FENW", "Fenway Park"], ["YANK", "Yankee Stadium"], ["DODG", "Dodger Stadium"], ["KAUF", "Kauffman Stadium"], ["ORIO", "Camden Yards"], ["SBCP", "San Francisco (2000)"], ["COOR", "Coors Field"], ["PNCP", "PNC Park"], ["SAFE", "Seattle (1999)"]];
+const SHAPES = [["Symmetric", [330, 375, 400, 375, 330]], ["Bandbox", [315, 350, 385, 350, 315]], ["Pitcher's park", [340, 390, 410, 390, 340]], ["Short porch right", [335, 380, 405, 360, 300]], ["Short porch left", [305, 365, 405, 380, 335]], ["Polo Grounds", [279, 450, 483, 449, 258]], ["Deep centre", [330, 380, 435, 380, 330]]];
+const DEFAULT = { parkName: "Pioneer Field", parkBase: "", fences: [330, 375, 400, 375, 330], city: "Portland", name: "Pioneers", abbr: "POR", slot: "TB", c1: "#10503c", c2: "#ebc85a", c3: "#f4efe2",
+  badge: "roundel", mono: "P", monoFont: "Graduate", emblem: "pine", ringText: true, swoosh: false,
+  capText: "P", capFont: "Graduate", crown: "#10503c", brim: "#10503c", capUseLogo: false,
+  wordText: "Pioneers", wordFont: "Oleo Script", arch: 35, tail: true,
+  homeCloth: "#f3f0e7", roadCloth: "#a9abae", roadWord: "city", piping: true, pins: false, numFill: "#10503c", numLine: "#ebc85a" };
+let S = Object.assign({}, DEFAULT);
+const imgs = { logo: null, cap: null, word: null };
+try { const d = JSON.parse(localStorage.getItem("mvp-team-maker") || "null"); if (d) S = Object.assign({}, DEFAULT, d); } catch (e) {}
+const $ = id => document.getElementById(id);
+
+// ---------------------------------------------------------------- controls
+$("slot").innerHTML = SLOTS.map(([c, n]) => `<option value="${c}">${n}</option>`).join("");
+for (const id of ["monoFont", "capFont", "wordFont"]) $(id).innerHTML = FONTS.map(([f, d]) => `<option value="${f}">${f} — ${d}</option>`).join("");
+function chips(el, list, key) {
+  $(el).innerHTML = list.map(([v, l]) => `<button type="button" data-v="${v}">${l}</button>`).join("");
+  $(el).addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S[key] = b.dataset.v; sync(); });
+}
+chips("badge", BADGES, "badge"); chips("emblem", EMBLEMS, "emblem");
+$("parkBase").innerHTML = PARKS.map(([c, n]) => `<option value="${c}">${n}</option>`).join("");
+$("parkPresets").innerHTML = SHAPES.map(([n], i) => `<button type="button" data-i="${i}">${n}</button>`).join("");
+$("parkPresets").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; S.fences = SHAPES[b.dataset.i][1].slice(); sync(); });
+for (let i = 0; i < 5; i++) $("f" + i).addEventListener("input", () => { const v = +$("f" + i).value; if (v >= 250 && v <= 500) { S.fences = S.fences.slice(); S.fences[i] = v; draw(); save(); } });
+$("presets").innerHTML = PRESETS.map((p, i) => `<button type="button" data-i="${i}" title="${p.join(" / ")}" style="background:linear-gradient(135deg,${p[0]} 50%,${p[1]} 50%)"></button>`).join("");
+$("presets").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const p = PRESETS[b.dataset.i]; S.c1 = p[0]; S.c2 = p[1]; S.c3 = p[2]; S.crown = p[0]; S.brim = p[0]; S.numFill = p[0]; S.numLine = p[1]; sync(); });
+const TEXT = ["city", "name", "abbr", "mono", "capText", "wordText", "parkName"], COLOR = ["c1", "c2", "c3", "crown", "brim", "homeCloth", "roadCloth", "numFill", "numLine"], SEL = ["slot", "monoFont", "capFont", "wordFont", "roadWord", "parkBase"], CHK = ["ringText", "swoosh", "capUseLogo", "tail", "piping", "pins"];
+for (const k of TEXT) $(k).addEventListener("input", () => { S[k] = k === "abbr" ? $(k).value.toUpperCase() : $(k).value; draw(); save(); updateBar(); });
+for (const k of COLOR) $(k).addEventListener("input", () => { S[k] = $(k).value; $(k + "t").textContent = S[k]; draw(); save(); });
+for (const k of SEL) $(k).addEventListener("change", () => { S[k] = $(k).value; draw(); save(); updateBar(); });
+for (const k of CHK) $(k).addEventListener("change", () => { S[k] = $(k).checked; draw(); save(); });
+$("arch").addEventListener("input", () => { S.arch = +$("arch").value; draw(); save(); });
+function loadImg(input, key) {
+  $(input).addEventListener("change", () => {
+    const f = $(input).files[0]; if (!f) return;
+    const im = new Image(); im.onload = () => { imgs[key] = im; if (key === "logo") $("logoClear").hidden = false; draw(); };
+    im.src = URL.createObjectURL(f);
+  });
+}
+loadImg("logoFile", "logo"); loadImg("capFile", "cap"); loadImg("wordFile", "word");
+$("logoClear").addEventListener("click", () => { imgs.logo = null; $("logoFile").value = ""; $("logoClear").hidden = true; draw(); });
+$("tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  for (const t of $("tabs").children) t.setAttribute("aria-selected", t === b);
+  for (const p of document.querySelectorAll(".pane")) p.hidden = p.dataset.p !== b.dataset.t;
+  if (b.dataset.t === "export") showExport();
+});
+function save() { try { localStorage.setItem("mvp-team-maker", JSON.stringify(S)); } catch (e) {} }
+function sync() {
+  for (const k of TEXT) $(k).value = S[k];
+  for (const k of COLOR) { $(k).value = S[k]; $(k + "t").textContent = S[k]; }
+  for (const k of SEL) $(k).value = S[k];
+  for (const k of CHK) $(k).checked = !!S[k];
+  $("arch").value = S.arch;
+  if (!Array.isArray(S.fences) || S.fences.length !== 5) S.fences = DEFAULT.fences.slice();
+  for (let i = 0; i < 5; i++) $("f" + i).value = S.fences[i];
+  for (const b of $("badge").children) b.setAttribute("aria-pressed", b.dataset.v === S.badge);
+  for (const b of $("emblem").children) b.setAttribute("aria-pressed", b.dataset.v === S.emblem);
+  draw(); save(); updateBar();
+}
+function updateBar() {
+  $("nb-name").textContent = `${S.city} ${S.name}`.trim() || "Your club";
+  $("nb-abbr").textContent = S.abbr || "—"; $("nb-abbr").style.background = S.c1; $("nb-abbr").style.color = readable(S.c1);
+  $("nb-slot").textContent = "Replaces: " + (SLOTS.find(s => s[0] === S.slot) || ["", ""])[1];
+  $("zipName").textContent = (S.abbr || "TEAM") + "-team.zip";
+}
+function readable(hex) { const [r, g, b] = rgb(hex); return (r * .3 + g * .59 + b * .11) > 150 ? "#111" : "#fff"; }
+function rgb(h) { h = h.replace("#", ""); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); }
+
+// ---------------------------------------------------------------- drawing
+function fitText(ctx, text, font, maxW, maxH, weight = "") {
+  let size = maxH;
+  ctx.font = `${weight} ${size}px "${font}"`;
+  const w = ctx.measureText(text).width;
+  if (w > maxW) size = size * maxW / w;
+  ctx.font = `${weight} ${size}px "${font}"`;
+  return size;
+}
+function strokeFill(ctx, text, x, y, fill, line, lw, line2) {
+  ctx.lineJoin = "round"; ctx.miterLimit = 2;
+  if (line2) { ctx.strokeStyle = line2; ctx.lineWidth = lw * 2.2; ctx.strokeText(text, x, y); }
+  if (line) { ctx.strokeStyle = line; ctx.lineWidth = lw; ctx.strokeText(text, x, y); }
+  ctx.fillStyle = fill; ctx.fillText(text, x, y);
+}
+function badgePath(ctx, kind, cx, cy, r) {
+  ctx.beginPath();
+  if (kind === "roundel" || kind === "circle") ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  else if (kind === "oval") ctx.ellipse(cx, cy, r, r * 0.68, 0, 0, Math.PI * 2);
+  else if (kind === "diamond") { ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r, cy); ctx.closePath(); }
+  else if (kind === "hexagon") { for (let i = 0; i < 6; i++) { const a = Math.PI / 6 + i * Math.PI / 3; ctx[i ? "lineTo" : "moveTo"](cx + r * Math.cos(a), cy + r * Math.sin(a)); } ctx.closePath(); }
+  else if (kind === "shield") { const w = r * 0.86; ctx.moveTo(cx - w, cy - r * 0.86); ctx.quadraticCurveTo(cx, cy - r * 1.02, cx + w, cy - r * 0.86); ctx.lineTo(cx + w, cy - r * 0.1); ctx.quadraticCurveTo(cx + w * 0.92, cy + r * 0.62, cx, cy + r); ctx.quadraticCurveTo(cx - w * 0.92, cy + r * 0.62, cx - w, cy - r * 0.1); ctx.closePath(); }
+}
+function arcText(ctx, text, cx, cy, r, center, top, font, size, fill) {
+  ctx.save(); ctx.font = `${size}px "${font}"`; ctx.fillStyle = fill; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const chars = [...text.toUpperCase()]; const widths = chars.map(c => ctx.measureText(c).width + size * 0.12);
+  const total = widths.reduce((a, b) => a + b, 0); let ang = center - (top ? 1 : -1) * total / r / 2;
+  for (let i = 0; i < chars.length; i++) {
+    const a = ang + (top ? 1 : -1) * widths[i] / r / 2;
+    ctx.save(); ctx.translate(cx + r * Math.cos(a), cy + r * Math.sin(a)); ctx.rotate(a + (top ? Math.PI / 2 : -Math.PI / 2)); ctx.fillText(chars[i], 0, 0); ctx.restore();
+    ang += (top ? 1 : -1) * widths[i] / r;
+  }
+  ctx.restore();
+}
+function emblem(ctx, kind, cx, cy, s, c1, c2, c3) {
+  ctx.save(); ctx.translate(cx, cy); ctx.lineJoin = "round"; ctx.lineCap = "round";
+  if (kind === "star") { ctx.beginPath(); for (let i = 0; i < 10; i++) { const r = i % 2 ? s * 0.42 : s; const a = -Math.PI / 2 + i * Math.PI / 5; ctx[i ? "lineTo" : "moveTo"](r * Math.cos(a), r * Math.sin(a)); } ctx.closePath(); ctx.fillStyle = c2; ctx.strokeStyle = c1; ctx.lineWidth = s * 0.08; ctx.fill(); ctx.stroke(); }
+  else if (kind === "bats") { for (const sg of [1, -1]) { ctx.save(); ctx.rotate(sg * 0.68); ctx.beginPath(); ctx.moveTo(-s * 0.05, s * 1.05); ctx.lineTo(-s * 0.12, -s * 0.95); ctx.quadraticCurveTo(0, -s * 1.12, s * 0.12, -s * 0.95); ctx.lineTo(s * 0.05, s * 1.05); ctx.closePath(); ctx.fillStyle = c3; ctx.strokeStyle = c1; ctx.lineWidth = s * 0.07; ctx.fill(); ctx.stroke(); ctx.restore(); } }
+  else if (kind === "ball") { ctx.beginPath(); ctx.arc(0, 0, s, 0, Math.PI * 2); ctx.fillStyle = c3; ctx.fill(); ctx.lineWidth = s * 0.08; ctx.strokeStyle = c1; ctx.stroke(); ctx.strokeStyle = c2; ctx.lineWidth = s * 0.07; for (const sg of [1, -1]) { ctx.beginPath(); ctx.arc(sg * s * 1.55, 0, s * 1.05, Math.PI - 0.62, Math.PI + 0.62); if (sg < 0) { ctx.beginPath(); ctx.arc(-s * 1.55, 0, s * 1.05, -0.62, 0.62); } ctx.stroke(); } }
+  else if (kind === "pine") { ctx.fillStyle = c1; ctx.strokeStyle = c2; ctx.lineWidth = s * 0.06; ctx.beginPath(); const tiers = 3; for (let i = 0; i < tiers; i++) { const y0 = -s + i * s * 0.55, w = s * (0.45 + i * 0.25); ctx.moveTo(0, y0); ctx.lineTo(w, y0 + s * 0.75); ctx.lineTo(-w, y0 + s * 0.75); ctx.closePath(); } ctx.fill(); ctx.stroke(); ctx.fillRect(-s * 0.1, s * 0.85, s * 0.2, s * 0.25); }
+  else if (kind === "anchor") { ctx.strokeStyle = c1; ctx.lineWidth = s * 0.16; ctx.beginPath(); ctx.moveTo(0, -s * 0.7); ctx.lineTo(0, s * 0.9); ctx.moveTo(-s * 0.45, -s * 0.4); ctx.lineTo(s * 0.45, -s * 0.4); ctx.stroke(); ctx.beginPath(); ctx.arc(0, s * 0.2, s * 0.75, 0.25 * Math.PI, 0.75 * Math.PI); ctx.stroke(); ctx.beginPath(); ctx.arc(0, -s * 0.85, s * 0.18, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.restore();
+}
+function drawImageFit(ctx, im, x, y, w, h) { const k = Math.min(w / im.width, h / im.height); const dw = im.width * k, dh = im.height * k; ctx.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh); }
+
+function drawLogo(cv) {
+  const ctx = cv.getContext("2d"), W = cv.width, cx = W / 2, cy = W / 2, r = W * 0.46;
+  ctx.clearRect(0, 0, W, W);
+  if (imgs.logo) { drawImageFit(ctx, imgs.logo, W * 0.03, W * 0.03, W * 0.94, W * 0.94); return; }
+  const b = S.badge; let inner = r;
+  if (b !== "none") {
+    badgePath(ctx, b, cx, cy, r); ctx.fillStyle = S.c1; ctx.fill();
+    if (b === "roundel") {
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.94, 0, Math.PI * 2); ctx.fillStyle = S.c3; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2); ctx.fillStyle = S.c1; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2); ctx.fillStyle = S.c2; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.58, 0, Math.PI * 2); ctx.fillStyle = S.c1; ctx.fill();
+      inner = r * 0.58;
+      if (S.ringText) { arcText(ctx, S.city, cx, cy, r * 0.8, -Math.PI / 2, true, S.monoFont, r * 0.17, S.c1); arcText(ctx, S.name, cx, cy, r * 0.8, Math.PI / 2, false, S.monoFont, r * 0.17, S.c1); for (const a of [Math.PI, 0]) emblemDot(ctx, cx + r * 0.8 * Math.cos(a), cy, r * 0.05); }
+    } else {
+      badgePath(ctx, b, cx, cy, r * 0.9); ctx.fillStyle = S.c3; ctx.fill(); badgePath(ctx, b, cx, cy, r * 0.84); ctx.fillStyle = S.c1; ctx.fill(); inner = r * 0.8;
+      if (S.ringText && (b === "circle")) { ctx.beginPath(); ctx.arc(cx, cy, r * 0.66, 0, Math.PI * 2); ctx.fillStyle = S.c1; ctx.fill(); arcText(ctx, S.city, cx, cy, r * 0.73, -Math.PI / 2, true, S.monoFont, r * 0.12, S.c3); arcText(ctx, S.name, cx, cy, r * 0.73, Math.PI / 2, false, S.monoFont, r * 0.12, S.c3); inner = r * 0.62; }
+    }
+  }
+  const onBadge = b !== "none";
+  const fill = onBadge ? S.c3 : S.c1, line = S.c2;
+  if (S.emblem !== "none") emblem(ctx, S.emblem, cx, cy + (S.mono ? -inner * 0.05 : 0), inner * (S.mono ? 0.62 : 0.7), onBadge ? S.c2 : S.c1, S.c2, S.c3);
+  if (S.mono) {
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const size = fitText(ctx, S.mono, S.monoFont, inner * (S.mono.length > 1 ? 1.5 : 1.1), inner * (S.emblem !== "none" ? 0.95 : 1.25));
+    strokeFill(ctx, S.mono, cx, cy + size * 0.06, fill, line, size * 0.07, onBadge ? S.c1 : null);
+  }
+  if (S.swoosh) { ctx.beginPath(); ctx.moveTo(cx - inner * 0.75, cy + inner * 0.6); ctx.quadraticCurveTo(cx, cy + inner * 0.38, cx + inner * 0.8, cy + inner * 0.42); ctx.quadraticCurveTo(cx, cy + inner * 0.52, cx - inner * 0.75, cy + inner * 0.6); ctx.fillStyle = S.c2; ctx.fill(); }
+}
+function emblemDot(ctx, x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * 0.45 : r; const a = -Math.PI / 2 + i * Math.PI / 5; ctx[i ? "lineTo" : "moveTo"](x + rr * Math.cos(a), y + rr * Math.sin(a)); } ctx.closePath(); ctx.fillStyle = S.c1; ctx.fill(); }
+
+function drawCapLogo(cv) {          // the logo that goes on the cap: transparent, 256 px
+  const ctx = cv.getContext("2d"), W = cv.width; ctx.clearRect(0, 0, W, W);
+  if (imgs.cap) { drawImageFit(ctx, imgs.cap, 4, 4, W - 8, W - 8); return; }
+  if (S.capUseLogo) { const t = document.createElement("canvas"); t.width = t.height = W; drawLogo(t); ctx.drawImage(t, 0, 0); return; }
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const size = fitText(ctx, S.capText || S.mono, S.capFont, W * 0.86, W * 0.86);
+  strokeFill(ctx, S.capText || S.mono, W / 2, W / 2 + size * 0.06, S.c3 === S.crown ? S.c2 : S.c3, S.c2, size * 0.06);
+}
+function drawWord(cv, text) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  if (imgs.word) { drawImageFit(ctx, imgs.word, 8, 8, W - 16, H - 16); return; }
+  const t = text || S.wordText; if (!t) return;
+  ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+  const size = fitText(ctx, t, S.wordFont, W * 0.9, H * 0.62);
+  const chars = [...t]; const ws = chars.map(c => ctx.measureText(c).width); const total = ws.reduce((a, b) => a + b, 0);
+  const arch = S.arch / 100, half = total / 2 || 1, rise = arch * size * 0.55;
+  const base = H * 0.68 + rise * 0.4;
+  const pos = []; let x = W / 2 - total / 2;
+  for (let i = 0; i < chars.length; i++) {          // letters on a parabola: highest in the middle, tilted along it
+    const mid = x + ws[i] / 2, u = (mid - W / 2) / half;
+    pos.push([mid, base - rise * (1 - u * u), Math.atan(2 * rise * u / half)]); x += ws[i];
+  }
+  for (const pass of [2, 1, 0]) {
+    for (let i = 0; i < chars.length; i++) {
+      const [mx, my, a] = pos[i];
+      ctx.save(); ctx.translate(mx, my); ctx.rotate(a); ctx.lineJoin = "round";
+      if (pass === 2) { ctx.strokeStyle = S.c3; ctx.lineWidth = size * 0.2; ctx.strokeText(chars[i], 0, 0); }
+      if (pass === 1) { ctx.strokeStyle = S.c2; ctx.lineWidth = size * 0.11; ctx.strokeText(chars[i], 0, 0); }
+      if (pass === 0) { ctx.fillStyle = S.c1; ctx.fillText(chars[i], 0, 0); }
+      ctx.restore();
+    }
+  }
+  if (S.tail) {
+    const x0 = W / 2 - total * 0.42, x1 = W / 2 + total * 0.5, y0 = base + size * 0.14;
+    for (const [col, lw] of [[S.c3, size * 0.2], [S.c2, size * 0.12], [S.c1, size * 0.055]]) {
+      ctx.beginPath(); ctx.moveTo(x0, y0 + size * 0.06); ctx.quadraticCurveTo(W / 2, y0 - size * 0.06 + arch * size * 0.25, x1, y0 - size * 0.2);
+      ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.stroke();
+    }
+  }
+}
+
+function drawJersey(cv, cloth, wordCanvas, pins) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--well"); ctx.fillRect(0, 0, W, H);
+  // cap above the jersey
+  drawCapShape(ctx, W / 2, 92, 74);
+  // jersey body
+  const body = new Path2D(); const t = 190;
+  body.moveTo(W * 0.32, t); body.lineTo(W * 0.1, t + 40); body.lineTo(W * 0.02, t + 170); body.lineTo(W * 0.17, t + 192); body.lineTo(W * 0.22, t + 120);
+  body.lineTo(W * 0.23, H - 14); body.lineTo(W * 0.77, H - 14); body.lineTo(W * 0.78, t + 120); body.lineTo(W * 0.83, t + 192); body.lineTo(W * 0.98, t + 170); body.lineTo(W * 0.9, t + 40); body.lineTo(W * 0.68, t);
+  body.quadraticCurveTo(W * 0.5, t + 70, W * 0.32, t); body.closePath();
+  ctx.save(); ctx.fillStyle = cloth; ctx.fill(body); ctx.clip(body);
+  const g = ctx.createLinearGradient(0, t, W, H); g.addColorStop(0, "rgba(255,255,255,.18)"); g.addColorStop(.5, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.18)"); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (pins) { ctx.strokeStyle = S.c1; ctx.globalAlpha = .55; ctx.lineWidth = 2; for (let x = 8; x < W; x += 15) { ctx.beginPath(); ctx.moveTo(x, t); ctx.lineTo(x, H); ctx.stroke(); } ctx.globalAlpha = 1; }
+  // undershirt in the collar
+  ctx.beginPath(); ctx.moveTo(W * 0.38, t + 4); ctx.quadraticCurveTo(W * 0.5, t + 62, W * 0.62, t + 4); ctx.closePath(); ctx.fillStyle = S.c1; ctx.fill();
+  if (S.piping) {
+    ctx.strokeStyle = S.c1; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(W * 0.32, t); ctx.quadraticCurveTo(W * 0.5, t + 70, W * 0.68, t); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W * 0.5, t + 52); ctx.lineTo(W * 0.5, H); ctx.stroke();
+    for (const [a, b, c, d] of [[0.02, 170, 0.17, 192], [0.98, 170, 0.83, 192]]) { ctx.beginPath(); ctx.moveTo(W * a, t + b - 10); ctx.lineTo(W * c, t + d - 10); ctx.stroke(); }
+  }
+  ctx.fillStyle = "rgba(0,0,0,.25)"; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(W * 0.5 + 9, t + 80 + i * 56, 4, 0, Math.PI * 2); ctx.fill(); }
+  ctx.drawImage(wordCanvas, W * 0.2, t + 70, W * 0.6, W * 0.6 * wordCanvas.height / wordCanvas.width);
+  // chest number
+  ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = `64px "Graduate"`; strokeFill(ctx, "27", W * 0.33, t + 225, S.numFill, S.numLine, 5);
+  ctx.restore();
+  ctx.lineWidth = 2; ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.stroke(body);
+}
+function drawCapShape(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(cx + r * 0.55, cy + r * 0.42, r * 0.95, r * 0.22, -0.08, 0, Math.PI * 2); ctx.fillStyle = S.brim; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(cx - r, cy + r * 0.45); ctx.bezierCurveTo(cx - r, cy - r * 0.95, cx + r, cy - r * 0.95, cx + r, cy + r * 0.45); ctx.closePath(); ctx.fillStyle = S.crown; ctx.fill();
+  const g = ctx.createRadialGradient(cx - r * 0.3, cy - r * 0.4, 4, cx, cy, r * 1.2); g.addColorStop(0, "rgba(255,255,255,.22)"); g.addColorStop(1, "rgba(0,0,0,.18)"); ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx, cy - r * 0.62, r * 0.08, 0, Math.PI * 2); ctx.fillStyle = S.crown; ctx.fill();
+  const t = document.createElement("canvas"); t.width = t.height = 256; drawCapLogo(t); ctx.drawImage(t, cx - r * 0.5, cy - r * 0.48, r, r);
+  ctx.restore();
+}
+function drawCapCard(cv) {
+  const ctx = cv.getContext("2d"), W = cv.width; ctx.clearRect(0, 0, W, W);
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--well"); ctx.fillRect(0, 0, W, W);
+  drawCapShape(ctx, W / 2 - 40, W / 2 + 20, W * 0.32);
+}
+function drawPark(cv) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height; ctx.clearRect(0, 0, W, H);
+  const css = getComputedStyle(document.documentElement);
+  ctx.fillStyle = css.getPropertyValue("--well") || "#1b1f1d"; ctx.fillRect(0, 0, W, H);
+  const f = S.fences, k = (H - 70) / 520, hx = W / 2, hy = H - 34;        // home plate at the bottom, 1 ft = k px
+  const pt = (deg, ft) => { const a = (135 - deg) * Math.PI / 180; return [hx + Math.cos(a) * ft * k, hy - Math.sin(a) * ft * k]; };
+  const at = deg => { const t = deg / 22.5, i = Math.min(3, Math.floor(t)), u = t - i, s = u * u * (3 - 2 * u); return f[i] + (f[i + 1] - f[i]) * s; };
+  // stands behind the fence, the grass, the warning track, the wall
+  ctx.beginPath(); ctx.moveTo(hx, hy); for (let d = 0; d <= 90; d += 1) ctx.lineTo(...pt(d, at(d) + 60)); ctx.closePath();
+  ctx.fillStyle = S.c1; ctx.globalAlpha = 0.35; ctx.fill(); ctx.globalAlpha = 1;
+  ctx.beginPath(); ctx.moveTo(hx, hy); for (let d = 0; d <= 90; d += 1) ctx.lineTo(...pt(d, at(d))); ctx.closePath();
+  ctx.fillStyle = "#5c4a32"; ctx.fill();
+  ctx.beginPath(); ctx.moveTo(hx, hy); for (let d = 0; d <= 90; d += 1) ctx.lineTo(...pt(d, at(d) - 14)); ctx.closePath();
+  ctx.fillStyle = "#3f7d3a"; ctx.fill();
+  ctx.beginPath(); for (let d = 0; d <= 90; d += 1) ctx[d ? "lineTo" : "moveTo"](...pt(d, at(d))); ctx.lineWidth = 7; ctx.strokeStyle = S.c1; ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = S.c2; ctx.stroke();
+  // the infield
+  const b = 90 * k; ctx.save(); ctx.translate(hx, hy); ctx.rotate(-Math.PI / 4);
+  ctx.fillStyle = "#8a6a45"; ctx.beginPath(); ctx.arc(0, 0, 155 * k, -Math.PI / 2 - 0.02, 0.02); ctx.lineTo(0, 0); ctx.fill();
+  ctx.fillStyle = "#3f7d3a"; ctx.fillRect(0, -b, b, b); ctx.restore();
+  ctx.fillStyle = "#e9e3d3"; for (const [x, y] of [[0, 0], [b * Math.SQRT1_2, -b * Math.SQRT1_2], [0, -b * Math.SQRT2], [-b * Math.SQRT1_2, -b * Math.SQRT1_2]]) { ctx.fillRect(hx + x - 4, hy + y - 4, 8, 8); }
+  ctx.strokeStyle = "#e9e3d3"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(...pt(0, at(0))); ctx.lineTo(hx, hy); ctx.lineTo(...pt(90, at(90))); ctx.stroke();
+  // the distances
+  ctx.font = "600 24px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  [0, 22.5, 45, 67.5, 90].forEach((d, i) => { const [x, y] = pt(d, f[i] + 34); ctx.fillStyle = "#000a"; ctx.fillRect(x - 28, y - 15, 56, 30); ctx.fillStyle = "#fff"; ctx.fillText(String(f[i]), x, y); });
+  ctx.textAlign = "left"; ctx.font = "600 26px system-ui, sans-serif"; ctx.fillStyle = css.getPropertyValue("--ink") || "#eee";
+  ctx.fillText(S.parkName || "", 18, 30);
+  $("parkSub").textContent = (PARKS.find(p => p[0] === (S.parkBase || "")) || ["", ""])[1];
+}
+const wordHome = document.createElement("canvas"), wordRoad = document.createElement("canvas");
+wordHome.width = wordRoad.width = 1024; wordHome.height = wordRoad.height = 320;
+function draw() {
+  drawLogo($("cvLogo")); drawCapCard($("cvCap")); drawWord($("cvWord"));
+  drawWord(wordHome); drawWord(wordRoad, S.roadWord === "city" ? S.city : S.wordText);
+  drawJersey($("cvHome"), S.homeCloth, wordHome, S.pins); drawJersey($("cvRoad"), S.roadCloth, wordRoad, false);
+  const m = $("mini").getContext("2d"); m.clearRect(0, 0, 96, 96); m.drawImage($("cvLogo"), 0, 0, 96, 96);
+  drawPark($("cvPark"));
+}
+
+// ---------------------------------------------------------------- export
+function teamJson() {
+  const base = { trim: S.c1, undershirt: S.c1, crown: S.crown, brim: S.brim, button: S.crown, helmet: S.crown, numbers: S.numFill, numbers_outline: S.numLine, cap_logo: "cap_logo.png" };
+  return { format: 1, made_with: "MVP Team Maker", slot: S.slot, city: S.city, name: S.name, abbr: (S.abbr || "").toUpperCase(), colors: [S.c1, S.c2, S.c3],
+    uniforms: { a: Object.assign({ cloth: S.homeCloth, wordmark: "wordmark.png", pinstripes: S.pins }, base),
+                b: Object.assign({ cloth: S.roadCloth, wordmark: S.roadWord === "city" ? "wordmark_road.png" : "wordmark.png", pinstripes: false }, base) },
+    park: { name: S.parkName || "", base: S.parkBase || "", fences: S.fences.slice() },
+    design: S };
+}
+function showExport() {
+  $("json").textContent = JSON.stringify(teamJson(), null, 2);
+  const z = (S.abbr || "TEAM") + "-team.zip";
+  $("cmd").textContent = `python3 tools/custom_league.py "game/MVP Baseball 2005 (USA).iso" teams   # every .zip in teams/ -> mods/pack-mine ("My League")`;
+}
+const blobOf = cv => new Promise(r => cv.toBlob(r, "image/png"));
+$("export").addEventListener("click", async () => {
+  const st = $("status"); st.textContent = "Preparing…";
+  try {
+    const logo = document.createElement("canvas"); logo.width = logo.height = 512; drawLogo(logo);
+    const cap = document.createElement("canvas"); cap.width = cap.height = 256; drawCapLogo(cap);
+    const z = new JSZip();
+    z.file("team.json", JSON.stringify(teamJson(), null, 2));
+    z.file("logo.png", await blobOf(logo)); z.file("cap_logo.png", await blobOf(cap));
+    z.file("wordmark.png", await blobOf(wordHome)); z.file("wordmark_road.png", await blobOf(wordRoad));
+    const blob = await z.generateAsync({ type: "blob" });
+    const dl = await claude.use("downloads");
+    if (!dl) { st.textContent = "Saving files isn't available in this view. Open the page in the Claude app or on claude.ai to save."; return; }
+    await dl.save({ filename: (S.abbr || "TEAM") + "-team.zip", data: blob });
+    st.textContent = "Saved. Add it to a league pack with the commands below.";
+  } catch (e) {
+    st.textContent = e && e.code === "declined" ? "Not saved." : "Couldn't save the file" + (e && e.message ? ": " + e.message : ".");
+  }
+});
+
+document.fonts.ready.then(() => Promise.all(FONTS.map(([f]) => document.fonts.load(`40px "${f}"`)))).then(draw, draw);
+sync();
+</script>

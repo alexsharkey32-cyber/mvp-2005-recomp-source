@@ -1,0 +1,94 @@
+# Builds the game for macOS (Apple Silicon), Windows (x64) and Linux (x64) on every push, and publishes the three
+# downloads as a GitHub release when a tag v* is pushed. The features (rosters, eras, the HD pack...) are a separate
+# release, "features", uploaded from a machine that has them with tools/release/make_features.py --upload.
+#
+# Repository variables (Settings > Secrets and variables > Actions > Variables), both optional:
+#   FEATURES_REPO  owner/repo whose "features" release the launcher downloads from (default: this repository).
+#                  It has to be public for players to download it.
+name: build
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FEATURES_URL: https://github.com/${{ vars.FEATURES_REPO || 'alexsharkey32-cyber/mvp2005-recomp-releases' }}/releases/download/features/manifest.json
+
+jobs:
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: brew install sdl2 molten-vk vulkan-headers shaderc ninja
+      - name: Build
+        run: |
+          cmake -S . -B out -G Ninja -DCMAKE_BUILD_TYPE=Release -DMVP_FEATURES_URL="$FEATURES_URL" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 2>&1 | tee cfg.log; [ ${PIPESTATUS[0]} -eq 0 ] || { tail -20 cfg.log | sed 's/^/::error::/'; exit 1; }
+          cmake --build out --parallel -- -k 0 2>&1 | tee build.log; ok=${PIPESTATUS[0]}
+          [ $ok -eq 0 ] || { { grep -E "error|Error|undefined reference" build.log | head -40; tail -8 build.log; } | sed 's/^/::error::/'; exit 1; }
+      - name: Package
+        run: bash tools/release/package_mac.sh out/mvp2005 dist
+      - uses: actions/upload-artifact@v4
+        with: { name: mvp2005-mac, path: dist/*.zip }
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-SDL2 mingw-w64-ucrt-x86_64-vulkan-headers mingw-w64-ucrt-x86_64-shaderc
+            mingw-w64-ucrt-x86_64-python mingw-w64-ucrt-x86_64-ntldd zip
+      - name: Build
+        run: |
+          set +e +o pipefail
+          cmake -S . -B out -G Ninja -DCMAKE_BUILD_TYPE=Release -DMVP_FEATURES_URL="$FEATURES_URL" 2>&1 | tee cfg.log; [ ${PIPESTATUS[0]} -eq 0 ] || { tail -25 cfg.log | sed 's/^/::error::/'; exit 1; }
+          cmake --build out --parallel -- -k 0 2>&1 | tee build.log; ok=${PIPESTATUS[0]}
+          [ $ok -eq 0 ] || { { grep -E "error|Error|undefined reference" build.log | head -40; tail -8 build.log; } | sed 's/^/::error::/'; exit 1; }
+      - name: Package
+        run: bash tools/release/package_windows.sh out/mvp2005.exe dist
+      - uses: actions/upload-artifact@v4
+        with: { name: mvp2005-windows, path: dist/*.zip }
+
+  linux:
+    runs-on: ubuntu-22.04          # the oldest glibc we build against: runs on any newer distribution
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev libvulkan-dev glslang-tools ninja-build patchelf
+      - name: Build
+        run: |
+          cmake -S . -B out -G Ninja -DCMAKE_BUILD_TYPE=Release -DMVP_FEATURES_URL="$FEATURES_URL" 2>&1 | tee cfg.log; [ ${PIPESTATUS[0]} -eq 0 ] || { tail -25 cfg.log | sed 's/^/::error::/'; exit 1; }
+          cmake --build out --parallel -- -k 0 2>&1 | tee build.log; ok=${PIPESTATUS[0]}
+          [ $ok -eq 0 ] || { { grep -E "error|Error|undefined reference" build.log | head -40; tail -8 build.log; } | sed 's/^/::error::/'; exit 1; }
+      - name: Package
+        run: bash tools/release/package_linux.sh out/mvp2005 dist
+      - uses: actions/upload-artifact@v4
+        with: { name: mvp2005-linux, path: dist/*.tar.gz }
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Publish
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "MVP Baseball 2005 Recomp $GITHUB_REF_NAME" \
+            --notes "Download the one for your computer, unzip it and start the game: it asks for your MVP Baseball 2005 (USA) disc image and lets you pick the features to install."

@@ -1,0 +1,31 @@
+# art file city|nickname (tools/eras/era_logo_years.py)
+2 l001_1901.ssh Philadelphia|Athletics
+2 l001_1955.ssh Kansas City|Athletics
+2 l001_2025.ssh Sacramento|Athletics
+4 l003_1961.ssh Washington|Senators
+6 l005_1901.ssh Cleveland|Blues
+6 l005_1902.ssh Cleveland|Bronchos
+6 l005_1903.ssh Cleveland|Naps
+6 l005_2022.ssh Cleveland|Guardians
+9 l008_1901.ssh Washington|Senators
+10 l009_1901.ssh Milwaukee|Brewers
+10 l009_1902.ssh St. Louis|Browns
+11 l010_1901.ssh Boston|Americans
+12 l011_1901.ssh Baltimore|Orioles
+12 l011_1903.ssh New York|Highlanders
+17 l016_1901.ssh Brooklyn|Superbas
+17 l016_1911.ssh Brooklyn|Dodgers
+17 l016_1914.ssh Brooklyn|Robins
+19 l018_1901.ssh New York|Giants
+20 l019_1901.ssh Chicago|Orphans
+21 l020_1954.ssh Cincinnati|Redlegs
+22 l021_1962.ssh Houston|Colt .45's
+23 l022_1969.ssh Seattle|Pilots
+26 l025_1901.ssh Boston|Beaneaters
+26 l025_1907.ssh Boston|Doves
+26 l025_1911.ssh Boston|Rustlers
+26 l025_1912.ssh Boston|Braves
+26 l025_1936.ssh Boston|Bees
+26 l025_1953.ssh Milwaukee|Braves
+28 l027_1969.ssh Montreal|Expos
+30 l029_1943.ssh Philadelphia|Blue Jays

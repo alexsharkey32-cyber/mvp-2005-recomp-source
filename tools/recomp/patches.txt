@@ -1,0 +1,66 @@
+# Optional code patches, compiled in but switched at runtime.
+# address     new-word    option     note
+0x004757d0    0xae310224  widescreen # DisplaySettings ctor: widescreen flag (+0x224) = non-zero
+0x00476a24    0xae310224  widescreen # Display init: same
+0x0029d47c    0x94430588  widescreen # Apt var gWidescreenMode -> "1"
+0x001d91e8    0x24020000  widescreen # 16:9 menu art (wstad/wbkgnds.big) was never shipped: keep 4:3 art
+0x001d94a0    0x24020000  widescreen
+0x001d9618    0x24020000  widescreen
+0x001da4e8    0x24020000  widescreen
+# Ultrawide / other aspect ratios (with widescreen on): the 16:9 projection aspect and the 4:3 horizontal factor
+# (aspect / (4/3)) come from runtime values when they are set (0 = EA's 16:9).
+0x0043b1e0    =g_ws_xscale var      # lui  $at, hi(4/3): f_0043b1c0 horizontal factor in widescreen
+0x0043b1e4    =g_ws_xscale var      # ori
+0x0043b228    =g_ws_aspect var      # lui  $at, hi(16/9): f_0043b208 projection aspect in widescreen
+0x0043b22c    =g_ws_aspect var      # ori
+0x0047f0d4    =g_ws_aspect var      # lui  $at, hi(16/9): camera setup
+0x0047f0d8    =g_ws_aspect var      # ori
+# Universal DH (2022). func_0018a9c0(db, league, left-handed starter, DH rule) picks one of the four lineups a
+# club keeps (0/2 with a DH vs RHP/LHP, 1/3 without). With the rule at its default, 0, there is a DH when "league"
+# (the home club's, 10 counts as 0) is 0, the AL. Leaving it 0 makes that every game; the other settings of the
+# game's own DH Rule option (2 always, 3 never) still work.
+0x0018a9c8    0x00000000  dh         # movn v1, a1, v0  ->  v1 stays 0
+# No DH anywhere (seasons before 1973, an era pack): "league" made 1 (the NL) for every park; the DH Rule option's
+# "always" still works.
+0x0018a9c0    0x24020000  nodh       # xori v0, a1, 10  ->  li v0, 0 (the movn below does nothing)
+0x0018a9c4    0x24030001  nodh       # move v1, zero    ->  li v1, 1
+# Stolen bases in simulated games. func_00714f10(engine, base): a runner who has not tried yet, fewer than two out,
+# the next base open, his club not five or more runs ahead, goes with probability 0.3728 * (stealing_aggressive / 15)^2.
+# With the 2005 rosters that gives the leaders 35 steals at the all-star break. Attempts per game are up by about a
+# third since the bigger bases and the pickoff limit (2023): 0.48 under the 2026 rules.
+# The runtime sets g_sim_steal: 0.48 under the 2026 rules, by season in an era pack (hle.cpp sim_steal_for), -1 for
+# the game's own 0.3728.
+0x00715024    =g_sim_steal  var      # lui  $at, hi(steal)
+0x00715028    =g_sim_steal  var      # ori  $at, $at, lo(steal)
+# Tiring in simulated games: func_0071af18 takes 1.562 + random(0..1) off the pitcher's current stamina for every
+# batter (the stamina rating is the full tank). Starters pitch deeper in a 2005 season than today's go (5.5 innings,
+# about 15 percent fewer pitches): 2.0 under the 2026 rules (1.85 gave a simulated 2026 top innings of 219-230 and
+# 1.4 % complete games, real 2025 192-207 and 0.6 %; 2.05 gave 202-218 and 0.3 %).
+# The runtime sets g_sim_drain: 2.0 under the 2026 rules, less for the complete-game eras (sim.txt / the pack's
+# season), -1 for the game's own 1.562.
+0x0071afb4    =g_sim_drain  var      # lui  $at, hi(drain)
+0x0071afb8    =g_sim_drain  var      # ori  $at, $at, lo(drain)
+# Pitching changes in simulated games. func_007199d0 lets a pitcher go on while his stamina left (current / full,
+# 0x752270) is at least 0.3, or past that in a few late-and-close situations. With today's ratings that gave the
+# 2027 leaders 245 innings and 12 complete games, 2005 workloads. Today's managers take the starter out a time
+# through the order earlier: 0.4 under the 2026 rules (starters about 5.5 innings, relievers one).
+# g_sim_pull: 0.4 under the 2026 rules, lower for the complete-game eras, -1 for the game's own 0.3.
+0x00719cd8    =g_sim_pull   var      # lui  $at, hi(pull)
+0x00719cdc    =g_sim_pull   var      # ori  $at, $at, lo(pull)
+0x00719d0c    =g_sim_pull   var      # lui  $at, hi(pull)
+0x00719d10    =g_sim_pull   var      # ori  $at, $at, lo(pull)
+# A simulated starter's relief (func_0071a050): the first look by inning and score takes only relievers 85 %+ rested;
+# when it finds none the starter stays unless he is spent, less than 0.01 of his stamina left (then any reliever,
+# tired or not). With today's relievers tiring (hle.cpp hle_sim_tire) few are back to 85 % and starters stayed in to
+# the end (complete games 3 % of starts, real 2025 0.6 %): g_sim_spent 0.25 there (-1: the game's 0.01).
+0x0071a2ac    =g_sim_spent  var      # lui  $at, hi(0.01)
+0x0071a2b0    =g_sim_spent  var      # ori
+
+# Late pitching changes in simulated games (func_007199d0): with fewer than three innings left the game makes the
+# change whenever the club is not ahead (s7 >= fp). The managers of the complete-game eras let a good starter finish:
+# for a held starter (hle.cpp hle_sim_pitch_change, g_sim_hold) the runtime turns this on for that one call.
+0x00719d2c    0x28620000  holdlate   # slti v0, v1, 3  ->  slti v0, v1, 0 (never: the late rule does not fire)
+
+# Boot: func_0026e3a0 waits until 240 vblanks (4 s) after a start time it noted before it shows anything (a black
+# screen before the EA logo; nothing loads meanwhile: the main thread polls the counter, the others are idle). Made 0.
+0x0026e460    0x26100000  fastboot   # addiu s0, s0, 240  ->  addiu s0, s0, 0

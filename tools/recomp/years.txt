@@ -1,0 +1,76 @@
+# Calendar-year constants in the game's code. The game's world starts in 2005; with a modern roster the runtime sets
+# g_year_shift = (first year of that roster's dynasty) - 2005 and every constant below moves with it. The two date
+# conversions (wraps.txt) move the year the same way, so the day numbers the game keeps inside are what they always
+# were: only the years it shows and compares are different. Without a modern roster the shift is 0.
+# address    kind (i: integer immediate, default; f: lui + ori of a float)
+#
+# static dates, one copy per translation unit: 3/1, 3/29, 5/15, 7/31 and 11/1 of the first year
+0x001074cc
+0x0015f53c
+0x0017ad40
+0x001baf94
+0x00263f40
+0x00273804
+0x00293cfc
+0x0029accc
+0x002a283c
+0x002e7e70
+0x0030f76c
+0x0036d7e0
+0x003861fc
+0x003a1210
+0x003baecc
+0x003fc588
+0x00429720
+0x00439a0c
+0x004422fc
+0x004697f4
+0x004839c0
+0x0048dd34
+0x00490a14
+0x004ac7e0
+0x0069e4f0
+0x007443b0
+# the first year itself
+0x00180e64   # a new season's calendar starts in 2005
+0x00192420   # the year when there is no calendar
+0x001efc40   # end-of-dynasty test: no dynasty -> 2005
+0x001efd08   #   "the year before was before 2005"
+0x004b1e64   # ages outside a dynasty are counted to 3/26/2005
+0x005ebab8   # first-season special case
+0x00608a8c   # end-of-dynasty message: 2005 ...
+0x0066eb70   # Create Player: seasons since 2005 (li 2004 / li 2005 / addiu -2005) move the birth-year range
+0x0066eb74
+0x0066eb88
+0x00736a4c   # owner mode: first-season special case
+0x0074f948   # load the schedule of 2005
+# year - 2005
+0x00187670   # all-star host table, (year - 2005) mod 32 ...
+0x0018767c   #   ... or year - 1974 for earlier years
+0x00652f18
+0x0070bcd8   # which schedule file: (year - 2005) mod 6, mod 4, mod 2
+0x0070be68
+0x0073ba60   # owner mode, seasons played
+0x0073bca0
+0x0073bf2c
+0x0073c270
+0x0073c680
+0x007564e0
+0x00756828
+0x00758f04
+# contracts: years are kept as 2004 + n
+0x0073ec80
+0x0073ec9c
+0x0073ecbc
+0x0073eddc
+# second season
+0x0073b974
+# the last year: a dynasty ends in 2125 (day numbers are 16 bits), owner mode in 2035
+0x001efc7c
+0x001efc94
+0x00608ad4
+0x00608aec
+0x00608bfc
+# Create Player: birth years 1961.0 .. 1987.0
+0x0066e890 f
+0x0066e8a0 f
