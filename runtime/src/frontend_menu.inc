@@ -246,7 +246,9 @@ static std::vector<Tile> hub_tiles() {
         v.push_back({"LEAGUES & ERAS", league_label(), "Today, 2005, or a season from history", 1});
         v.push_back({"HOME TEAM", g_settings.team >= 0 ? team_name(g_settings.team) : "No team", "Your club's ballpark and colours", 2});
         v.push_back({"SETTINGS", "Settings", look, 3});
-        v.push_back({"SETUP", "Disc & Features", !s_launch_ok ? (s_launch_iso.empty() ? std::string("Choose your game disc") : std::string("Disc problem: open to see")) : features_summary(), 4});
+        const int nu = features_load_state() == 2 ? features_update_count() : 0;
+        v.push_back({"SETUP", "Disc & Features", !s_launch_ok ? (s_launch_iso.empty() ? std::string("Choose your game disc") : std::string("Disc problem: open to see"))
+                                                 : nu ? (nu == 1 ? std::string("1 update ready to install") : std::to_string(nu) + " updates ready to install") : features_summary(), 4});
     } else {
         v.push_back({"PAUSED", "Resume", "Back to the game", 0});
         v.push_back({"SETTINGS", "Settings", look, 3});
@@ -272,11 +274,38 @@ static void draw_icon(int icon, float cx, float cy, float r, u32 col, float t) {
     default: break;
     }
 }
+// ---- updates: a newer game on the download page, newer versions of installed features (right, under the header)
+static void draw_update_notices(int dw, int dh, float s, float a, float M, float y, u32 acc, u32 on_acc) {
+    struct Notice { std::string text, button; int kind; };
+    std::vector<Notice> v;
+    GameUpdate u;
+    if (update_available(&u)) v.push_back({"Version " + u.version + " is available  \xC2\xB7  you have " + game_version(), "Download", 12});
+    if (features_load_state() == 2 && !features_busy()) {
+        int n = features_update_count();
+        if (n) v.push_back({n == 1 ? std::string("1 feature has an update") : std::to_string(n) + " features have updates", "Update", 13});
+    }
+    const float h = 44 * s, fs = 15 * s;
+    for (const Notice& nt : v) {
+        const float bw = ui_text_width(nt.button, 14 * s, FONT_BOLD) + 32 * s, tw = ui_text_width(nt.text, fs, FONT_BOLD);
+        const float w = std::min((float)dw - 2 * M, 42 * s + tw + 18 * s + bw + 6 * s), x = dw - M - w;
+        glass(dw, dh, x, y, w, h, h / 2, a, s);
+        s_ui.rect(x + 18 * s, y + h / 2 - 4 * s, 8 * s, 8 * s, with_alpha(G_WARN, a), 4 * s);
+        s_ui.shadow(x + 18 * s, y + h / 2 - 4 * s, 8 * s, 8 * s, 4 * s, 6 * s, with_alpha(G_WARN, 0.5f * a));
+        s_ui.text(x + 38 * s, y + (h - ui_line_height(fs)) / 2, nt.text, fs, with_alpha(G_TEXT, a), FONT_BOLD);
+        const float bx = x + w - bw - 6 * s, by = y + 6 * s, bh = h - 12 * s;
+        const bool hov = s_mouse_x >= bx && s_mouse_x < bx + bw && s_mouse_y >= by && s_mouse_y < by + bh;
+        s_ui.rect(bx, by, bw, bh, with_alpha(acc, (hov ? 1.0f : 0.85f) * a), bh / 2);
+        s_ui.text(bx + 16 * s, by + (bh - ui_line_height(14 * s)) / 2, nt.button, 14 * s, with_alpha(on_acc, a), FONT_BOLD);
+        s_hits.push_back({bx, by, bw, bh, nt.kind, 0, 0});
+        y += h + 10 * s;
+    }
+}
 static void draw_hub(int dw, int dh, float s, float t) {
     const float M = 56 * s;
     u32 acc, acc2, on_acc; accent_colours(acc, acc2, on_acc);
     const float k = view_k(), slide = (1 - k) * 26 * s, a = t * k;
-    draw_header(dw, dh, s, t, M, "", "", false);
+    const float head_bottom = draw_header(dw, dh, s, t, M, "", "", false);
+    if (s_launcher) draw_update_notices(dw, dh, s, a, M, head_bottom + 16 * s, acc, on_acc);
     std::vector<Tile> tiles = hub_tiles();
     const int n = (int)tiles.size();
     s_hub_sel = std::min(std::max(0, s_hub_sel), n - 1);

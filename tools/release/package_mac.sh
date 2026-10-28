@@ -23,7 +23,7 @@ done
 [ -f "$BREW/lib/libMoltenVK.dylib" ] && cp -L "$BREW/lib/libMoltenVK.dylib" "$APP/Contents/Frameworks/"
 bash "$ROOT/tools/release/seed.sh" "$APP/Contents/Resources"
 mv "$APP/Contents/Resources/README.md" "$STAGE/README.md"
-VER="${GITHUB_REF_NAME:-dev}"
+VER="${GITHUB_REF_NAME:-}"; case "$VER" in v[0-9]*) ;; *) VER="v$(sed -n 's/^#define MVP_VERSION "\(.*\)"/\1/p' "$(dirname "$0")/../../runtime/include/version.h")";; esac
 cat > "$APP/Contents/Info.plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

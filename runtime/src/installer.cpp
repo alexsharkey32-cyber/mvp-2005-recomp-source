@@ -2,6 +2,7 @@
 // macOS, Windows 10 (1803) and later, and practically every Linux, so the game needs no network library.
 #include "installer.h"
 #include "settings.h"
+#include "version.h"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -385,6 +386,7 @@ void features_plan(uint64_t& download, uint64_t& add_disk, uint64_t& free_disk) 
         if (!f.selected && f.installed) free_disk += f.install_size;
     }
 }
+int features_update_count() { int n = 0; for (const Feature& f : s_feats) if (needs_update(f)) n++; return n; }
 FeatureProgress features_progress() { std::lock_guard<std::mutex> lk(s_mx); return s_prog; }
 std::vector<std::pair<std::string, bool>> features_job() { std::lock_guard<std::mutex> lk(s_mx); return s_job; }
 void features_cancel() { s_cancel = true; }
@@ -665,3 +667,69 @@ void features_load_async(bool refresh) {
 }
 int features_load_state() { return s_load_state; }
 std::string features_load_error() { std::lock_guard<std::mutex> lk(s_mx); return s_load_err; }
+
+// ---------------------------------------------------------------- updates of the game itself
+const char* game_version() { return MVP_VERSION; }
+static std::mutex s_upd_mx;
+static GameUpdate s_upd;
+static bool s_upd_found = false;
+static std::atomic<bool> s_upd_started{false};
+// "v1.2.3" / "1.2" -> {1,2,3}; empty when it isn't a version
+static std::vector<int> version_parts(std::string v) {
+    std::vector<int> out;
+    if (!v.empty() && (v[0] == 'v' || v[0] == 'V')) v.erase(0, 1);
+    if (v.empty() || !std::isdigit((unsigned char)v[0])) return out;
+    size_t i = 0;
+    while (i < v.size() && std::isdigit((unsigned char)v[i])) {
+        int n = 0; while (i < v.size() && std::isdigit((unsigned char)v[i])) n = n * 10 + (v[i++] - '0');
+        out.push_back(n);
+        if (i < v.size() && v[i] == '.') i++; else break;
+    }
+    return out;
+}
+static bool newer(const std::vector<int>& a, const std::vector<int>& b) {       // a > b
+    for (size_t i = 0; i < std::max(a.size(), b.size()); i++) { int x = i < a.size() ? a[i] : 0, y = i < b.size() ? b[i] : 0; if (x != y) return x > y; }
+    return false;
+}
+// the releases list of the repository the built-in features manifest is on (https://github.com/OWNER/REPO/releases/...)
+static std::string releases_api() {
+    if (const char* e = std::getenv("MVP_UPDATE_URL")) return e;
+    const std::string u = MVP_FEATURES_URL, gh = "https://github.com/";
+    if (u.rfind(gh, 0) != 0) return "";
+    size_t b = u.find('/', gh.size()); if (b == std::string::npos) return "";
+    size_t c = u.find('/', b + 1); if (c == std::string::npos) return "";
+    return "https://api.github.com/repos/" + u.substr(gh.size(), c - gh.size()) + "/releases?per_page=30";
+}
+void update_check_async() {
+    if (s_upd_started.exchange(true)) return;
+    if (!g_settings.check_updates || std::getenv("MVP_NO_UPDATE_CHECK")) return;
+    const std::string url = releases_api();
+    if (url.empty()) return;
+    std::thread([url] {
+        std::error_code ec; fs::create_directories(kDir, ec);
+        const std::string tmp = std::string(kDir) + "/releases.json";
+        int rc = run_process(std::vector<std::string>{tool("curl"), "-L", "--fail", "-s", "-S", "--connect-timeout", "10", "--max-time", "20",
+                                                      "-H", "Accept: application/vnd.github+json", "-o", tmp, url}, std::string(kDir) + "/download.log", [] {});
+        if (rc != 0) { rlog("update", "could not check for updates (curl %d)", rc); return; }
+        JVal j; if (!json_parse(read_text(tmp), j) || j.t != JVal::ARR) { rlog("update", "unexpected answer from %s", url.c_str()); return; }
+        const std::vector<int> mine = version_parts(MVP_VERSION);
+        std::vector<int> best = mine; GameUpdate up; bool found = false;
+        for (const JVal& r : j.a) {
+            const JVal *tag = r.get("tag_name"), *draft = r.get("draft"), *pre = r.get("prerelease");
+            if (!tag || tag->t != JVal::STR || (draft && draft->b) || (pre && pre->b)) continue;
+            std::vector<int> v = version_parts(tag->s);
+            if (v.empty() || !newer(v, best)) continue;
+            best = v; found = true;
+            up.version = tag->s[0] == 'v' || tag->s[0] == 'V' ? tag->s.substr(1) : tag->s;
+            const JVal* h = r.get("html_url"); up.url = h && h->t == JVal::STR ? h->s : "";
+            const JVal* n = r.get("body"); up.notes = n && n->t == JVal::STR ? n->s : "";
+        }
+        rlog("update", found ? "version %s is available (this is %s)" : "up to date (%s%s)", found ? up.version.c_str() : MVP_VERSION, found ? MVP_VERSION : "");
+        std::lock_guard<std::mutex> lk(s_upd_mx); s_upd = up; s_upd_found = found;
+    }).detach();
+}
+bool update_available(GameUpdate* out) {
+    std::lock_guard<std::mutex> lk(s_upd_mx);
+    if (s_upd_found && out) *out = s_upd;
+    return s_upd_found;
+}

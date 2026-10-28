@@ -3,10 +3,12 @@
 // current directory first.
 //   1. $MVP_HOME
 //   2. the current directory, when it already is one (a source checkout, a portable folder started from a shell)
-//   3. the folder of the program, when it is one or is writable and not inside a macOS app bundle (portable:
-//      Windows and Linux zips)
+//   3. the folder of the program, when it already is one (a portable install: version 1.0 kept everything there,
+//      and a folder can be made portable by putting a "portable" file next to the program)
 //   4. per user: macOS ~/Library/Application Support/MVP Baseball 2005 Recomp, Linux ~/.local/share/mvp2005-recomp,
-//      Windows %LOCALAPPDATA%\MVP Baseball 2005 Recomp
+//      Windows %LOCALAPPDATA%\MVP Baseball 2005 Recomp. Outside the program's folder, so a new version can simply
+//      replace the old one. The first time, the data of an older version unzipped next to this one
+//      (../MVPBaseball2005-*) is moved over.
 // Files the release ships next to the program (seed/: the league rates, era logos ...) are copied in when missing.
 #include <cstdio>
 #include <cstdlib>
@@ -31,10 +33,43 @@ static bool is_game_folder(const fs::path& d) {
     for (const char* m : {"mvp2005.ini", "mods", "game", "features", "memcards"}) if (fs::exists(d / m, ec)) return true;
     return false;
 }
-static bool writable(const fs::path& d) {
-    std::error_code ec; fs::path t = d / ".mvp_write_test";
-    FILE* f = std::fopen(t.string().c_str(), "w"); if (!f) return false;
-    std::fclose(f); fs::remove(t, ec); return true;
+// what belongs to the player in a game folder (everything else there came with the program)
+static const char* const kPlayerData[] = {"mvp2005.ini", "memcards", "mods", "textures", "features", "game", "music", "teams", "screenshots"};
+// an older version's folder next to this one, with the player's things in it (the newest such folder)
+static fs::path older_install(const fs::path& prog) {
+    std::error_code ec; fs::path best; fs::file_time_type bt{};
+    fs::path me = prog.lexically_normal(); if (!me.has_filename()) me = me.parent_path();   // (SDL's base path ends in a slash)
+    fs::path parent = me.parent_path();
+    for (auto it = fs::directory_iterator(parent, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) {
+        const fs::path d = it->path();
+        if (d == me || !it->is_directory(ec) || d.filename().string().rfind("MVPBaseball2005", 0) != 0) continue;
+        if (!fs::exists(d / "mvp2005.ini", ec)) continue;
+        auto t = fs::last_write_time(d / "mvp2005.ini", ec);
+        if (best.empty() || t > bt) { best = d; bt = t; }
+    }
+    return best;
+}
+// moves the player's things from an older version's folder into dir; false when they can't move (another drive):
+// then that folder stays the game folder
+static bool move_player_data(const fs::path& from, const fs::path& dir) {
+    std::error_code ec; fs::create_directories(dir, ec);
+    for (const char* n : kPlayerData) {
+        if (!fs::exists(from / n, ec) || fs::exists(dir / n, ec)) continue;
+        fs::rename(from / n, dir / n, ec);
+        if (ec) { std::fprintf(stderr, "could not move %s to %s: %s\n", (from / n).string().c_str(), dir.string().c_str(), ec.message().c_str()); return false; }
+    }
+    {   // the disc image the launcher remembers may have been inside the old folder
+        const fs::path ini = dir / "mvp2005.ini"; std::string text;
+        if (FILE* f = std::fopen(ini.string().c_str(), "rb")) { char buf[4096]; size_t n; while ((n = std::fread(buf, 1, sizeof buf, f)) > 0) text.append(buf, n); std::fclose(f); }
+        const std::string a = from.string(), b = dir.string(); bool changed = false;
+        for (size_t at = 0; !a.empty() && (at = text.find(a, at)) != std::string::npos; at += b.size()) { text.replace(at, a.size(), b); changed = true; }
+        if (changed) if (FILE* f = std::fopen(ini.string().c_str(), "wb")) { std::fwrite(text.data(), 1, text.size(), f); std::fclose(f); }
+    }
+    if (FILE* f = std::fopen((from / "MOVED.txt").string().c_str(), "w")) {
+        std::fprintf(f, "Your settings, saves and features were moved to\n%s\nwhere newer versions find them. This folder can be deleted.\n", dir.string().c_str()); std::fclose(f);
+    }
+    std::fprintf(stderr, "moved the game folder of %s to %s\n", from.string().c_str(), dir.string().c_str());
+    return true;
 }
 static std::string program_dir(const char* argv0) {
 #ifdef MVP_SDL
@@ -60,7 +95,7 @@ void data_dir_init(const char* argv0) {
     else if (is_game_folder(fs::current_path(ec))) dir = fs::current_path(ec);
     else {
         const bool bundle = prog.string().find(".app/Contents") != std::string::npos;
-        if (!bundle && (is_game_folder(prog) || writable(prog))) dir = prog;
+        if (!bundle && (is_game_folder(prog) || fs::exists(prog / "portable", ec))) dir = prog;
         else {
 #if defined(__APPLE__)
             const char* home = std::getenv("HOME");
@@ -71,6 +106,12 @@ void data_dir_init(const char* argv0) {
 #else
             const char* x = std::getenv("XDG_DATA_HOME"); const char* home = std::getenv("HOME");
             dir = x && *x ? fs::path(x) / "mvp2005-recomp" : fs::path(home ? home : ".") / ".local" / "share" / "mvp2005-recomp";
+#endif
+#if !defined(__APPLE__)
+            if (!is_game_folder(dir)) {                                     // first start of this version: an older one next to it?
+                fs::path old = older_install(prog);
+                if (!old.empty() && !move_player_data(old, dir)) dir = old;
+            }
 #endif
         }
     }

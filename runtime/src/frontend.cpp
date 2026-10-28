@@ -87,7 +87,7 @@ static int s_page = 0, s_sel = 0;                  // selected page / item
 static bool s_focus_side = true;                   // keyboard focus in the sidebar
 static float s_anim = 0, s_sel_anim = 0;           // open animation, highlight position
 static int s_action = -1;
-enum { ACT_RESUME, ACT_SAVE, ACT_RESET, ACT_SHOT, ACT_QUIT, ACT_RESET_IMAGE, ACT_IMPORT, ACT_PLAY, ACT_MUSIC_IMPORT, ACT_MUSIC_CLEAR };
+enum { ACT_RESUME, ACT_SAVE, ACT_RESET, ACT_SHOT, ACT_QUIT, ACT_RESET_IMAGE, ACT_IMPORT, ACT_PLAY, ACT_MUSIC_IMPORT, ACT_MUSIC_CLEAR, ACT_GET_UPDATE, ACT_UPDATE_FEATURES };
 static std::vector<MusicTrack> s_my_music; static bool s_my_music_read = false;          // music/*.asf (refreshed after an import)
 static bool s_music_failed = false; static int s_music_mode = -1;       // launcher music: no device or nothing to play / the mode playing
 static const std::vector<MusicTrack>& my_music() { if (!s_my_music_read) { s_my_music = music_tracks(); s_my_music_read = true; } return s_my_music; }
@@ -457,6 +457,8 @@ static void build_pages() {
         button("Save settings", ACT_SAVE, "Writes all settings to mvp2005.ini next to your memory cards."),
         toggle("Intro movies", &S.intro_movies, "The EA Sports logo and the game's minute-long intro movie at every start. Off: straight to the title screen (the movie is still in EA Sports Extras). Applies at the next start."),
         toggle("Show the launcher at start", &S.launcher, "Off: the game starts straight away next time. Hold Shift while starting the game (or run it with --launcher) to get the launcher again."),
+        toggle("Check for updates", &S.check_updates, "When the launcher starts it asks the download page whether there is a newer version of the game or of an installed feature, and says so on the start screen. Nothing is downloaded or changed without you choosing it."),
+        info("Version", [] { GameUpdate u; return std::string(game_version()) + (update_available(&u) ? "  \xC2\xB7  version " + u.version + " is available" : std::string()); }),
         button("Reset all settings", ACT_RESET, "Restores every setting to its default."),
         button("Quit game", ACT_QUIT, "Closes the game. Unsaved progress in the game is lost."),
         info("Renderer", [] { return std::string(s_pres ? s_pres->name() : "none"); }),
@@ -1045,6 +1047,8 @@ static void menu_mouse(float x, float y, bool click, bool drag) {
         case 8: { std::vector<Card> c = league_cards(); if (h.a == s_era_sel && h.a < (int)c.size()) choose_card(c[h.a]); else s_era_sel = h.a; return; }
         case 9: go_hub(); return;
         case 10: s_action = ACT_QUIT; return;
+        case 12: s_action = ACT_GET_UPDATE; return;
+        case 13: s_action = ACT_UPDATE_FEATURES; return;
         case 11: { Item& item = s_pages[s_page].items[h.a]; s_focus_side = false; s_sel = h.a; item.set(h.b); apply_video(); return; }
         case 2: s_focus_side = false; s_sel = h.a; change(s_pages[s_page].items[h.a], -1); return;
         case 3: s_focus_side = false; s_sel = h.a; change(s_pages[s_page].items[h.a], +1); return;
@@ -1325,6 +1329,8 @@ static void run_menu() {
         case ACT_SHOT: { static int n = 0; char p[64]; snprintf(p, sizeof p, "screenshot_%03d.png", n++); if (gs_screenshot(p)) toast(std::string("Screenshot saved: ") + p); break; }
         case ACT_QUIT: if (features_busy()) { features_cancel(); for (int i = 0; i < 60 && features_busy(); i++) SDL_Delay(100); } std::exit(0);
         case ACT_IMPORT: launcher_import(pick_file()); break;
+        case ACT_GET_UPDATE: { GameUpdate u; if (update_available(&u) && !u.url.empty()) { if (SDL_OpenURL(u.url.c_str()) == 0) toast("The download page is open in your browser: get the file for your computer and replace this one (your settings, saves and features stay)"); else toast("Open " + u.url + " to download version " + u.version); } break; }
+        case ACT_UPDATE_FEATURES: setup_open(1, false); setup_press(SB_INSTALL); break;
         case ACT_MUSIC_IMPORT: music_import_files(pick_files(true)); break;
         case ACT_MUSIC_CLEAR: { int n = music_remove_all(); s_my_music_read = false; menu_music_stop(); s_music_failed = false;
                                 toast(n ? std::to_string(n) + (n == 1 ? " song removed" : " songs removed") : std::string("There is no imported music")); break; }
@@ -1375,6 +1381,7 @@ bool frontend_launcher(std::string& iso_path, const std::string& elf_path, bool 
     if (!force && !shift && !g_settings.launcher && s_launch_ok) { iso_path = s_launch_iso; return true; }
     s_launcher = true; build_pages(); open_page(0); s_toast.clear();
     features_load_async();                                       // the list of features, in the background
+    update_check_async();                                        // a newer version of the game?
     s_view = V_HUB; s_focus_side = true;
     if (!s_park_px.empty()) s_pres->set_game(s_park_px.data(), s_park_w, s_park_h);       // the preview picture
     if (const char* pg = std::getenv("MVP_GUI_PAGE")) { gui_test_page(pg); }   // screenshots

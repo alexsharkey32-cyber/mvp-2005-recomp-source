@@ -91,7 +91,7 @@ static std::vector<Field> fields() {
         {"saturation", &s.saturation, nullptr, 0, 200}, {"gamma", &s.gamma, nullptr, 50, 200}, {"crt", &s.crt, nullptr, 0, 2},
         {"fps_limit", &s.fps_limit, nullptr, -1, 1000}, {"sim_timing", &s.sim_timing, nullptr, 0, 1},
         {"frameskip", &s.frameskip, nullptr, 0, 4}, {"show_fps", &s.show_fps, nullptr, 0, 2}, {"fps_corner", &s.fps_corner, nullptr, 0, 3}, {"pause_unfocused", nullptr, &s.pause_unfocused, 0, 1},
-        {"rosters", &s.rosters, nullptr, 0, 2}, {"commentary", nullptr, &s.commentary, 0, 1}, {"launcher", nullptr, &s.launcher, 0, 1}, {"intro_movies", nullptr, &s.intro_movies, 0, 1}, {"ai", &s.ai, nullptr, 0, 1}, {"team", &s.team, nullptr, -1, 29}, {"menu_music", nullptr, &s.menu_music, 0, 1}, {"music", &s.music, nullptr, 0, 2}, {"uniforms", &s.uniforms, nullptr, 0, 1}, {"stadiums", &s.stadiums, nullptr, 0, 1}, {"portraits", nullptr, &s.portraits, 0, 1}, {"head_shapes", nullptr, &s.head_shapes, 0, 1}, {"sim_league", &s.sim_league, nullptr, 0, 1},
+        {"rosters", &s.rosters, nullptr, 0, 2}, {"commentary", nullptr, &s.commentary, 0, 1}, {"launcher", nullptr, &s.launcher, 0, 1}, {"intro_movies", nullptr, &s.intro_movies, 0, 1}, {"ai", &s.ai, nullptr, 0, 1}, {"team", &s.team, nullptr, -1, 29}, {"menu_music", nullptr, &s.menu_music, 0, 1}, {"check_updates", nullptr, &s.check_updates, 0, 1}, {"music", &s.music, nullptr, 0, 2}, {"uniforms", &s.uniforms, nullptr, 0, 1}, {"stadiums", &s.stadiums, nullptr, 0, 1}, {"portraits", nullptr, &s.portraits, 0, 1}, {"head_shapes", nullptr, &s.head_shapes, 0, 1}, {"sim_league", &s.sim_league, nullptr, 0, 1},
         {"volume", &s.volume, nullptr, 0, 100}, {"mute", nullptr, &s.mute, 0, 1}, {"setup_done", nullptr, &s.setup_done, 0, 1},
     };
 }

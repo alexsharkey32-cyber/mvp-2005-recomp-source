@@ -49,6 +49,14 @@ std::vector<std::pair<std::string, bool>> features_job();   // the running (or l
 void features_cancel();
 bool features_busy();
 std::string human_bytes(uint64_t b);
+int features_update_count();                      // installed features that have a newer version on the release page
+
+// a newer version of the game itself, from the releases page (GitHub's list of releases of the repository the
+// features come from). Checked once per start, in the background.
+struct GameUpdate { std::string version, url, notes; };    // url: the release's page
+const char* game_version();
+void update_check_async();
+bool update_available(GameUpdate* out = nullptr);
 // the preview image of a feature, downloaded into features/previews/ (empty path while it isn't there yet)
 std::string features_preview_path(const FeaturePreview& p, bool after);
 void features_fetch_previews();                    // in the background

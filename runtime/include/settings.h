@@ -53,6 +53,7 @@ struct Settings {
     bool setup_done = false;      // the first-start setup (disc, features) has been through once
     int  ai = 1;                  // CPU play: 0 original (2005), 1 2026 rules (mods/ai-2026)
     int  team = -1;               // home team for the launcher / menu theme (0..29 in the game's order, -1 none)
+    bool check_updates = true;    // the launcher looks for a newer version on the releases page at start
     bool menu_music = true;       // the launcher plays the game's menu music from the disc
     int  uniforms = 1;            // 0 the 2005 uniforms, 1 today's looks from the game's own wardrobe (mods/uniforms-2026)
     int  sim_league = 1;          // simulated games: 0 the game's own numbers, 1 the real league of the season being played
