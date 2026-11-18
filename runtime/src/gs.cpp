@@ -1259,17 +1259,33 @@ static void mark_rect(u32 bp, u32 bw, u32 psm, int x0, int y0, int x1, int y1) {
 static u64 s_vram_gen_fwd(); 
 static void submit_one(const DrawState& d, u8 kind, const Vtx* v, int nv);
 static u64 s_hr_copy_frame = ~0ull;
+static inline int display_circuit() {
+    return (s_priv[0x00] & 2) ? 2 : 1;
+}
 static inline u32 display_fbp() {
-    u64 pmode = s_priv[0x00];
-    int circuit = (pmode & 2) ? 2 : 1;
-    if (!(pmode & 3)) circuit = 1;
-    return bits(s_priv[circuit == 1 ? 0x07 : 0x09], 0, 9) * 32;
+    return bits(s_priv[display_circuit() == 1 ? 0x07 : 0x09], 0, 9) * 32;
 }
 static void hr_target_changed(); static void lazy_clear();
+// A final copy can be split into strips. Each strip still spans a complete
+// axis of the displayed region. An inset sampling a wide texture does not.
+static bool spans_display_axis(const DrawState& d, const Vtx* v) {
+    const bool first = display_circuit() == 1;
+    const u64 fb = s_priv[first ? 0x07 : 0x09], display = s_priv[first ? 0x08 : 0x0a];
+    const int x = bits(fb, 32, 11), y = bits(fb, 43, 11);
+    const int w = (bits(display, 32, 12) + 1) / (bits(display, 23, 4) + 1);
+    const int h = bits(display, 44, 11) + 1;
+    auto covers = [](float a, float b, int lo, int hi, int start, int size) {
+        return size > 1 && lo <= start && hi >= start + size - 1 &&
+               std::ceil(std::min(a, b)) <= start && std::ceil(std::max(a, b)) >= start + size;
+    };
+    return covers(v[0].x, v[1].x, d.sx0, d.sx1, x, w) ||
+           covers(v[0].y, v[1].y, d.sy0, d.sy1, y, h);
+}
 // Watches draws into the display buffer: a textured full-screen-ish CT32 sprite copy names the main target.
 static void hr_track(const DrawState& d, u8 kind, const Vtx* v) {
     if (d.fbp != display_fbp()) return;
-    if (kind == 3 && d.tme && d.tpsm == CT32 && d.tbw >= 4 && d.tbp != d.fbp) {
+    static u64 composed_frame = ~0ull;
+    if (kind == 3 && d.tme && d.tpsm == CT32 && d.tbw >= 4 && d.tbp != d.fbp && spans_display_axis(d, v)) {
         if (s_hr_copy_frame != g_gs_frame || s_hr_tbp != d.tbp) {
             if (s_hr_tbp != d.tbp) { rlog("gs", "main target: %05x (tbw %u) at frame %llu", d.tbp, d.tbw, (unsigned long long)g_gs_frame); hr_target_changed(); }
             s_hr_copy_frame = g_gs_frame;
@@ -1283,9 +1299,12 @@ static void hr_track(const DrawState& d, u8 kind, const Vtx* v) {
                u0 = v[0].s / v[0].q * w; v0 = v[0].t / v[0].q * h; u1 = v[1].s / v[1].q * w; v1 = v[1].t / v[1].q * h; }
         s_hr_u0 = std::min({s_hr_u0, u0, u1}); s_hr_u1 = std::max({s_hr_u1, u0, u1});
         s_hr_v0 = std::min({s_hr_v0, v0, v1}); s_hr_v1 = std::max({s_hr_v1, v0, v1});
-        s_hr_valid = true;
-    } else if (s_hr_copy_frame != g_gs_frame) {
-        s_hr_valid = false;                          // something else draws straight to the screen (movies, loading)
+        s_hr_valid = composed_frame != g_gs_frame;
+    } else if ((d.fbmsk & 0x00ffffff) != 0x00ffffff) {
+        // A visible overlay drawn after the blit lives in the display buffer.
+        // Present that composed buffer, including earlier deferred copies.
+        if (s_hr_copy_frame == g_gs_frame) composed_frame = g_gs_frame;
+        s_hr_valid = false;
     }
 }
 // ---------------------------------------------------------------- GPU renderer glue
@@ -2242,11 +2261,17 @@ static void vertex_kick(u64 xyz, u32 z, u32 f, bool draw) {
         const int nv = prim == 6 ? 2 : 3;
         float x0 = s_vq[0].x, x1 = s_vq[0].x;
         for (int k = 1; k < nv; k++) { x0 = std::min(x0, s_vq[k].x); x1 = std::max(x1, s_vq[k].x); }
-        const float l = (float)d.sx0, r = (float)d.sx1 + 1;
-        if (r > l && x1 - x0 < (r - l) * 0.9f) {
-            const float cx = (l + r) * 0.5f; Vtx q[3] = {s_vq[0], s_vq[1], s_vq[2]};
-            for (int k = 0; k < nv; k++) q[k].x = cx + (q[k].x - cx) * g_hud_k;
-            submit(d, prim == 6 ? 3 : 2, q, nv);
+        const int width = d.fbw * 64;
+        if (width > 0 && x1 - x0 < width * 0.9f) {
+            // All HUD parts share the picture centre, including parts with a
+            // local scissor. Transform the clip in the same coordinate space.
+            auto hud_x = [width](float x) { return width * 0.5f + (x - width * 0.5f) * g_hud_k; };
+            DrawState hud = d;
+            hud.sx0 = (int)std::ceil(hud_x(d.sx0));
+            hud.sx1 = (int)std::ceil(hud_x(d.sx1 + 1)) - 1;
+            Vtx q[3];
+            for (int k = 0; k < nv; k++) { q[k] = s_vq[k]; q[k].x = hud_x(q[k].x); }
+            if (hud.sx0 <= hud.sx1) submit(hud, prim == 6 ? 3 : 2, q, nv);
             draw = false;
         }
     }
@@ -2831,9 +2856,7 @@ static bool gs_get_display_real(std::vector<u32>& out, int& W, int& H) {
         if (&out != &s_disp) out = s_disp;
         return true;
     }
-    u64 pmode = s_priv[0x00];
-    int circuit = (pmode & 2) ? 2 : (pmode & 1) ? 1 : 0;
-    if (!circuit) circuit = 1;
+    const int circuit = display_circuit();
     u64 dispfb = s_priv[circuit == 1 ? 0x07 : 0x09], display = s_priv[circuit == 1 ? 0x08 : 0x0a];
     u32 fbp = bits(dispfb, 0, 9) * 32, fbw = bits(dispfb, 9, 6), psm = bits(dispfb, 15, 5);
     u32 dbx = bits(dispfb, 32, 11), dby = bits(dispfb, 43, 11);
