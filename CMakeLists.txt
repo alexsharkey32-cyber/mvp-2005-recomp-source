@@ -5,8 +5,21 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/generated/functable.cpp)
-  execute_process(COMMAND ${Python3_EXECUTABLE} tools/recomp/ee_recomp.py WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+# A source checkout can already contain C++ generated with older game patches.
+# Regenerate on configure when the disc executable is available. Packaged source
+# trees that contain only pre-generated code can still build directly from it.
+set(GAME_ELF "${CMAKE_CURRENT_SOURCE_DIR}/game/SLUS_211.35")
+if(EXISTS "${GAME_ELF}")
+  file(GLOB RECOMP_TABLES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/recomp/*.txt")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${GAME_ELF}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/recomp/ee_recomp.py" ${RECOMP_TABLES})
+  execute_process(COMMAND "${Python3_EXECUTABLE}" tools/recomp/ee_recomp.py
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" RESULT_VARIABLE RECOMP_RESULT)
+  if(NOT RECOMP_RESULT EQUAL 0)
+    message(FATAL_ERROR "Game code generation failed")
+  endif()
+elseif(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/generated/functable.cpp")
+  message(FATAL_ERROR "Place the USA disc executable in game/SLUS_211.35 to generate the game code")
 endif()
 file(GLOB GEN_SRC ${CMAKE_SOURCE_DIR}/generated/*.cpp)
 file(GLOB RT_SRC ${CMAKE_SOURCE_DIR}/runtime/src/*.cpp)

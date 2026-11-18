@@ -155,6 +155,7 @@ bool settings_save(const std::string& path) {
 double g_display_aspect = 16.0 / 9.0;
 int g_display_hz = 60, g_auto_res = 2;
 float g_ws_aspect = 0, g_ws_xscale = 0;             // tools/recomp/patches.txt: the widescreen projection (0 = EA's 16:9)
+float g_ws_ui_scale = 0, g_ws_ui_pad = 0;           // sprite coordinates in EA's normalised HUD space
 double settings_aspect() {
     switch (g_settings.aspect) {
     case 0: return 4.0 / 3.0;
@@ -174,10 +175,25 @@ void settings_apply() {
     extern bool g_opt_widescreen;
     const double a = settings_aspect();
     g_settings.widescreen = a > 1.34;
+    // The boot patches initialise this word. The camera and HUD continue
+    // reading the live DisplaySettings object after a menu aspect change.
+    if (g_ram && g_opt_widescreen != g_settings.widescreen) {
+        u32 display = 0;
+        std::memcpy(&display, g_ram + 0x007ddeec, sizeof display);
+        constexpr u32 flag_offset = 0x224;
+        if (display >= 0x100000 && !(display & 3) && display <= 0x02000000 - flag_offset - sizeof(u32)) {
+            const u32 wide = g_settings.widescreen ? 1 : 0;
+            std::memcpy(g_ram + display + flag_offset, &wide, sizeof wide);
+        }
+    }
     g_opt_widescreen = g_settings.widescreen;
     const bool ea = std::fabs(a - 16.0 / 9.0) < 0.01;              // EA's own numbers when it is exactly 16:9
     g_ws_aspect = g_settings.widescreen && !ea ? (float)a : 0.0f;
     g_ws_xscale = g_settings.widescreen && !ea ? (float)(a * 0.75) : 0.0f;
+    // The source sprites are 4:3. Beyond 16:9 the optional GS-side adjustment
+    // handles the remaining width, including HUD primitives outside these helpers.
+    g_ws_ui_scale = g_settings.widescreen ? (float)((4.0 / 3.0) / std::min(a, 16.0 / 9.0)) : 0.0f;
+    g_ws_ui_pad = g_settings.widescreen ? (1.0f - g_ws_ui_scale) * 0.5f : 0.0f;
     extern float g_hud_k;
     g_hud_k = g_settings.hud_169 && a > 16.0 / 9.0 + 0.01 ? (float)(16.0 / 9.0 / a) : 1.0f;
     extern void kernel_set_refresh(int hz);
