@@ -409,8 +409,10 @@ def cond_expr(w):
 # ----------------------------------------------------------------------------- function emission
 
 def var_patch(nw, w, orig):
-    """a float constant built by lui + ori, taken from a runtime variable instead while it is above 0"""
+    """Substitute a positive runtime float for a LUI/ORI constant or an LWC1 load."""
     v = nw[0]; op = w >> 26; rt = (w >> 16) & 31
+    if op == 0x31:  # lwc1: preserve the original load when the setting is inactive
+        return 'if (%s > 0.0f) { c->f[%d].f = %s; } else { %s }' % (v, rt, v, orig)
     if op == 0x0f:
         return 'if (%s > 0.0f) { uint32_t _b; std::memcpy(&_b, &%s, 4); c->r[%d].SD[0] = (int32_t)_b; } else { %s }' % (v, v, rt, orig or ';')
     return 'if (!(%s > 0.0f)) { %s }' % (v, orig or ';')
