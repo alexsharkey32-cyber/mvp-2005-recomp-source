@@ -15,6 +15,13 @@
 0x0043b22c    =g_ws_aspect var      # ori
 0x0047f0d4    =g_ws_aspect var      # lui  $at, hi(16/9): camera setup
 0x0047f0d8    =g_ws_aspect var      # ori
+# EA's widescreen sprite helpers infer pixel aspect from cached buffer dimensions.
+# Use the displayed HUD shape for normalised X, width and integer anchor offsets.
+# Keep the game's per-draw bypass flags and its final anchor translation.
+0x00479d9c    =g_ws_ui_scale var    # scaled X
+0x00479dac    =g_ws_ui_pad   var    # centre the scaled X in the picture
+0x00479f20    =g_ws_ui_scale var    # scaled width
+0x0047a080    =g_ws_ui_scale var    # scaled integer offset used by the HUD anchor
 # Universal DH (2022). func_0018a9c0(db, league, left-handed starter, DH rule) picks one of the four lineups a
 # club keeps (0/2 with a DH vs RHP/LHP, 1/3 without). With the rule at its default, 0, there is a DH when "league"
 # (the home club's, 10 counts as 0) is 0, the AL. Leaving it 0 makes that every game; the other settings of the
